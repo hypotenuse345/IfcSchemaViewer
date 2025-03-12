@@ -291,6 +291,33 @@ class SchemaExplorationSubPage(SubPage):
             st.write(f"### {prop_enum_iri.fragment}")
             st.dataframe(prop_enum_info["members"], hide_index=True, use_container_width=True)
         
+        def display_select_info(select_iri, ifc_schema_graph: rdflib.Graph):
+            select_label = select_iri.n3(ifc_schema_graph.namespace_manager)
+            select_info = {
+                "iri": select_iri,
+                "name": select_label,
+                "members": []
+            }
+            results = ifc_schema_graph.query(
+                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                SELECT DISTINCT ?member_name ?member_description
+                WHERE {{
+                    <{select_iri}> <{ONT["hasValue"]}> ?member .
+                    ?member <{ONT["name"]}> ?member_name.
+                }}
+                """
+            )
+            for result_row in results:
+                select_info["members"].append({
+                    "select value": result_row.member_name,
+                    "url": f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{result_row.member_name}.htm"
+                })
+            st.write(f"### {select_iri.fragment}")
+            st.dataframe(select_info["members"], hide_index=True, use_container_width=True)
+                
+        
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
         for root_node in ifc_schema_graph.subjects(RDF.type, ONT["IfcSchema"], unique=True):
@@ -320,6 +347,8 @@ class SchemaExplorationSubPage(SubPage):
                         display_enum_info(selected_obj, ifc_schema_graph)
                     elif selected_type == "express:PropertyEnumeration":
                         display_prop_enum(selected_obj, ifc_schema_graph)
+                    elif selected_type == "express:Select":
+                        display_select_info(selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
                     
     
