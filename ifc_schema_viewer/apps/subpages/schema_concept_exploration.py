@@ -145,7 +145,15 @@ class SchemaExplorationSubPage(SubPage):
             return concepts_4_df
         
         def replace_ifc_concept_to_link(match):
-                return f"[{match.group(0)}](https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{match.group(0)}.htm)"
+            # import requests
+            # Testing the URL
+            url = f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{match.group(0)}.htm"
+            return f"[{match.group(0)}]({url})"
+            # response = requests.get(url)
+            # if response.status_code == 200:
+            #     return f"[{match.group(0)}]({url})"
+            # else:
+            #     return f"[{match.group(0)}](https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/{match.group(0).lower()}/content.html)"
             
         def display_conceptual_group_info(selected_conceptual_group, conceptual_groups, container):
             name = selected_conceptual_group
@@ -165,6 +173,95 @@ class SchemaExplorationSubPage(SubPage):
                 definitions = definitions.replace("\n", "\n\n")
                 pattern = r'Ifc\w+'
                 mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
+        
+        def render_selected_instance_echarts(ontology_graph: rdflib.Graph, instance_iri, height=400):
+            instance_iri = rdflib.URIRef(instance_iri)
+            echarts_graph_info = {"nodes":[], "links":[]}
+            echarts_graph_info["categories"] = []
+            echarts_graph_info["categories"].append({"name": "Instance"})
+            echarts_graph_info["categories"].append({"name": "Class"})
+            echarts_graph_info["categories"].append({"name": "Undefined"})
+            
+            category_map = {"Undefined": 2}
+            
+            instance_label = instance_iri.n3(ontology_graph.namespace_manager)
+            nodes_instantiated = [instance_label]
+            echarts_graph_info["nodes"].append({
+                "id": instance_label, "name": instance_label, "category": 0})
+            
+            # 正向关系
+            for pred, obj in ontology_graph.predicate_objects(instance_iri):
+                if isinstance(obj, rdflib.Literal):
+                    continue
+                pred_label = pred.n3(ontology_graph.namespace_manager)
+                obj_label = obj.n3(ontology_graph.namespace_manager)
+                if obj_label not in nodes_instantiated:
+                    if pred == RDF.type:
+                        echarts_graph_info["nodes"].append({
+                            "id": obj_label, "name": obj_label, "category": 1})
+                    else:
+                        try:
+                            obj_type = [ii for ii in list(ontology_graph.objects(obj, RDF.type)) if ii!=OWL.NamedIndividual][0]
+                            obj_type = obj_type.n3(ontology_graph.namespace_manager)
+                            if obj_type not in category_map:
+                                category_map[obj_type] = len(echarts_graph_info["categories"])
+                                echarts_graph_info["categories"].append({"name": obj_type})
+                        except:
+                            obj_type = "Undefined"
+                        echarts_graph_info["nodes"].append({
+                            "id": obj_label, "name": obj_label, "category": category_map[obj_type]
+                        })
+                        
+                    nodes_instantiated.append(obj_label)
+                echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(instance_label, obj_label, pred_label, line_type="dashed", show_label=True))
+                
+            # 反向关系
+            for subj, pred in ontology_graph.subject_predicates(instance_iri):
+                pred_label = pred.n3(ontology_graph.namespace_manager)
+                subj_label = subj.n3(ontology_graph.namespace_manager)
+                if subj_label not in nodes_instantiated:
+                    try:
+                        subj_type = [ii for ii in list(ontology_graph.objects(subj, RDF.type)) if ii!=OWL.NamedIndividual][0]
+                        subj_type = subj_type.n3(ontology_graph.namespace_manager)
+                        if subj_type not in category_map:
+                            category_map[subj_type] = len(echarts_graph_info["categories"])
+                            echarts_graph_info["categories"].append({"name": subj_type})
+                    except:
+                        subj_type = "Undefined"
+                    echarts_graph_info["nodes"].append({
+                        "id": subj_label, "name": subj_label, "category": category_map[subj_type]
+                    })
+                echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subj_label, instance_label, pred_label, line_type="dashed", show_label=True))
+            options = EchartsUtility.create_normal_echart_options(echarts_graph_info, instance_label.split(":")[1])
+            st_echarts(options, height=f"{height}px")
+        
+        def display_enum_info(enum_iri, ifc_schema_graph: rdflib.Graph):
+            enum_label = enum_iri.n3(ifc_schema_graph.namespace_manager)
+            enum_info = {
+                "iri": enum_iri,
+                "name": enum_label,
+                "members": []
+            }
+            results = ifc_schema_graph.query(
+                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                SELECT DISTINCT ?member_name ?member_description
+                WHERE {{
+                    <{enum_iri}> <{ONT["hasValue"]}> ?member .
+                    ?member a <{ONT["EnumValue"]}>;
+                        <{ONT["name"]}> ?member_name;
+                        <{ONT["description"]}> ?member_description.
+                }}
+                """
+            )
+            for result_row in results:
+                enum_info["members"].append({
+                    "enum value": result_row.member_name,
+                    "description": result_row.member_description
+                })
+            st.write(f"### {enum_iri.fragment}")
+            st.dataframe(enum_info["members"], hide_index=True, use_container_width=True)
         
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
@@ -188,6 +285,11 @@ class SchemaExplorationSubPage(SubPage):
                     selected_concept = selected_obj.fragment
                     mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                     display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
+                    with info_graph_col:
+                        render_selected_instance_echarts(ifc_schema_graph, selected_obj)
+                    selected_type = concepts["type"][selected_index]
+                    if selected_type == "express:Enum":
+                        display_enum_info(selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
                     
     

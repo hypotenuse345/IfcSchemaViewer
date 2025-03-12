@@ -97,26 +97,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             self.graph_status_subpage.render()
         elif subpage_option == "数据模式概念探索":
             self.schema_exploration_subpage.render()
-        
-        import re
 
-        # # 原始字符串
-        # text = "Hello, 123 World! 456"
-
-        # # 正则表达式模式，匹配数字
-        # pattern = r'\d+'
-
-        # # 定义一个替换函数
-        # def add_text(match):
-        #     # match.group() 是匹配到的内容
-        #     return f"({match.group()})"  # 在匹配到的内容前后添加括号
-
-        # # 使用 re.sub 和替换函数进行替换
-        # new_text = re.sub(pattern, add_text, text)
-
-        # st.write(new_text)  # 输出: Hello, (123) World! (456)
-
-        
         # with st.sidebar: 
         #     st.divider()
         #     badge(type="github", name="hypotenuse345/IfcSchemaViewer")
