@@ -311,9 +311,10 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         if not os.path.isfile("./resources/knowledge_graphs/ifc_schema.trig") or not os.path.isfile("./resources/ontologies/skos.rdf"):
             st.error("IFC Schema Graph not found. Please check the resources.")
             st.stop()
-        dataset = Dataset()
-        dataset.parse("./resources/knowledge_graphs/ifc_schema.trig", format="trig")
-        dataset.parse("./resources/ontologies/skos.rdf", format="xml")
+        with st.spinner("Parsing IFC Schema Graph to RDFLib Dataset...", show_time=True):
+            dataset = Dataset()
+            dataset.parse("./resources/knowledge_graphs/ifc_schema.trig", format="trig")
+            dataset.parse("./resources/ontologies/skos.rdf", format="xml")
         st.session_state.ifc_schema_dataset = dataset
         classes = set(dataset.subjects(predicate=RDF.type, object=OWL.Class, unique=True))
         for so in dataset.subject_objects(predicate=RDFS.subClassOf, unique=True):
@@ -360,6 +361,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         # 使用streamlit的侧边栏组件，创建一个下拉选择框，用于选择子页面
         with st.sidebar:
             st.header("🔍 IFC4.3 Viewer", divider=True)
+            st.write("For education purposes only.")
             # 下拉选择框的标签为“子页面导航”，选项为“图谱状态”
             subpage_option = st.selectbox("子页面导航", ["图谱状态", "数据模式概念探索"])
             
