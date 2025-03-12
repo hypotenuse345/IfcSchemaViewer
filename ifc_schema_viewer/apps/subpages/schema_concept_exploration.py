@@ -9,6 +9,7 @@ from rdflib import RDF, RDFS, OWL, SKOS, Dataset
 from typing import Optional, List, Dict, Any, Literal, Union
 
 import pandas as pd
+import re
 
 from .base import SubPage
 
@@ -143,19 +144,27 @@ class SchemaExplorationSubPage(SubPage):
             
             return concepts_4_df
         
+        def replace_ifc_concept_to_link(match):
+                return f"[{match.group(0)}](https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{match.group(0)}.htm)"
+            
         def display_conceptual_group_info(selected_conceptual_group, conceptual_groups, container):
             name = selected_conceptual_group
             selected_conceptual_group = conceptual_groups[selected_conceptual_group]
             with container.popover("当前概念组元数据", use_container_width=True):
                 mdlit(f"**{name}** @(更多信息)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/{name.lower()}/content.html)")
                 # mdlit(f"- **iri**: {selected_conceptual_group['iri']}")
-                mdlit(selected_conceptual_group["definitions"].replace("\n", "\n\n"))
+                definitions = selected_conceptual_group["definitions"].replace("\n", "\n\n")
+                pattern = r'Ifc\w+'
+                mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
         
         def display_concept_info(selected_concept, concept_type, definitions, container):
+            
             with container.popover("当前概念元数据", use_container_width=True):
                 mdlit(f"**{selected_concept}** @(更多信息)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                 mdlit(f"**{concept_type}**")
-                mdlit(definitions.replace("\n", "\n\n"))
+                definitions = definitions.replace("\n", "\n\n")
+                pattern = r'Ifc\w+'
+                mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
         
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
