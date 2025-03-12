@@ -16,7 +16,7 @@ INST = rdflib.Namespace("http://www.semantic.org/zeyupan/instances/CoALA4IFC_Sch
 from ..utils import EchartsUtility, GraphAlgoUtility
 
 from .base import StreamlitBaseApp
-from .subpages import GraphStatusSubPage, SubPage, SchemaConceptExplorationSubPage
+from .subpages import GraphStatusSubPage, SubPage, SchemaExplorationSubPage
 
 class IfcSchemaViewerApp(StreamlitBaseApp):
     
@@ -25,10 +25,10 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
     def graph_status_subpage(self) -> GraphStatusSubPage:
         return self._graph_status_subpage
     
-    _schema_concept_exploration_subpage: SchemaConceptExplorationSubPage = PrivateAttr()
+    _schema_exploration_subpage: SchemaExplorationSubPage = PrivateAttr()
     @property
-    def schema_concept_exploration_subpage(self) -> SchemaConceptExplorationSubPage:
-        return self._schema_concept_exploration_subpage
+    def schema_exploration_subpage(self) -> SchemaExplorationSubPage:
+        return self._schema_exploration_subpage
     
     
     def parse_ifc_schema_dataset(self):
@@ -82,7 +82,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         
         # 建立引用
         self._graph_status_subpage = GraphStatusSubPage()
-        self._schema_concept_exploration_subpage = SchemaConceptExplorationSubPage()
+        self._schema_exploration_subpage = SchemaExplorationSubPage()
         
         # 使用streamlit的侧边栏组件，创建一个下拉选择框，用于选择子页面
         with st.sidebar:
@@ -95,4 +95,4 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         if subpage_option == "图谱总体构成":
             self.graph_status_subpage.render()
         elif subpage_option == "数据模式概念探索":
-            self.schema_concept_exploration_subpage.render()
+            self.schema_exploration_subpage.render()

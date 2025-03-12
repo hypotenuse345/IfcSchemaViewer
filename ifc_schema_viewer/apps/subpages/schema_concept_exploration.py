@@ -13,12 +13,15 @@ from .base import SubPage
 
 from ...utils import EchartsUtility, GraphAlgoUtility
 
-class SchemaConceptExplorationSubPage(SubPage):
+class SchemaExplorationSubPage(SubPage):
+    def display_basic_info(self):
+        st.markdown("## Schema基本信息")
+    
     def render(self):
         with st.sidebar:
             sidetab1, sidetab2 = st.tabs(["📝 基本信息", "👨‍💻 开发者信息"])
         
-        # with sidetab1:
-        #     self.display_basic_info()
+        with sidetab1:
+            self.display_basic_info()
             
         self.display_creator_widget(sidetab2)
