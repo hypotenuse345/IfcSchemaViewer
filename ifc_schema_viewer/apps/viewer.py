@@ -87,8 +87,8 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         
         # 使用streamlit的侧边栏组件，创建一个下拉选择框，用于选择子页面
         with st.sidebar:
-            st.header("🔍 IFC4.3 Viewer", divider=True)
-            st.write("For education purposes only.")
+            st.header("🔍 IFC4.3 Schema Viewer", divider=True)
+            st.info("For educational purposes only.")
             # 下拉选择框的标签为“子页面导航”，选项为“图谱构成”
             subpage_option = st.selectbox("子页面导航", ["图谱总体构成", "数据模式概念探索"])
         
