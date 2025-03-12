@@ -206,10 +206,45 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
     
     @st.fragment
     def graph_status_subpage_display_subgraph_info(self):
-        # graphs = self.ifc_schema_dataset.graphs()
-        # graphs = {str(graph.identifier.n3(self.ifc_schema_dataset.namespace_manager)): graph for graph in graphs}
+        graphs = self.ifc_schema_dataset.graphs()
+        graphs = {str(graph.identifier.n3(self.ifc_schema_dataset.namespace_manager)): graph for graph in graphs}
         # st.write(graphs.keys())
-        pass
+        # subgraph_info = {"name":[], "size":[]}
+        # for graph_name in graphs.keys():
+        #     subgraph_info["name"].append(graph_name)
+        #     subgraph_info["size"].append(len(graphs[graph_name]))
+        # subgraph_info_df = pd.DataFrame(subgraph_info)
+        # subgraph_info_df = subgraph_info_df.sort_values(by="size", ascending=False)
+        # st.dataframe(subgraph_info_df, use_container_width=True)
+        grid = st_grid([1,1])
+        grid.metric("IFC4.3数据模式三元组数量", len(graphs["ifc:IFC_SCHEMA_GRAPH"]))
+        grid.metric("IFC4.3数据模式本体三元组数量", len(graphs["<urn:x-rdflib:default>"]))
+        num_in_column = 4
+        
+        subgraph_info = {}
+        for i, graph_name in enumerate(graphs.keys()):
+            if graph_name in ["ifc:IFC_SCHEMA_GRAPH", "<urn:x-rdflib:default>"]:
+                continue
+            if graph_name.startswith("ifc:CC_"):
+                name = graph_name[7:][:-6].replace("_", " ")
+            else:
+                name = graph_name
+            subgraph_info[name] = len(graphs[graph_name])
+        
+        with st.container(border=True):
+            sort_option = st.radio("排序方式", ["按名称", "按大小(降序)","按大小(升序)"], horizontal=True, label_visibility="collapsed")
+            if sort_option == "按名称":
+                subgraph_info = {k: v for k, v in sorted(subgraph_info.items(), key=lambda item: item[0])}
+            elif sort_option == "按大小(降序)":
+                subgraph_info = {k: v for k, v in sorted(subgraph_info.items(), key=lambda item: item[1], reverse=True)}
+            elif sort_option == "按大小(升序)":
+                subgraph_info = {k: v for k, v in sorted(subgraph_info.items(), key=lambda item: item[1])}
+            grid = st_grid(*[[1,]*num_in_column]*((len(graphs)-2)//num_in_column))
+            for i, (graph_name, size) in enumerate(subgraph_info.items()):
+                grid.metric(graph_name, size)
+                # grid.metric(name, len(graphs[graph_name]))
+            
+        
         
         
     @st.fragment
