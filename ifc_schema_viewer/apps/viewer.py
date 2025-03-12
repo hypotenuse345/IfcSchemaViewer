@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_extras.grid import grid as st_grid
 from streamlit_echarts import st_echarts
+from streamlit_extras.badges import badge
 
 from pydantic import BaseModel, Field, PrivateAttr
 from typing import Optional, List, Dict, Any, Literal, Union
@@ -96,3 +97,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             self.graph_status_subpage.render()
         elif subpage_option == "数据模式概念探索":
             self.schema_exploration_subpage.render()
+        
+        # with st.sidebar: 
+        #     st.divider()
+        #     badge(type="github", name="hypotenuse345/IfcSchemaViewer")
