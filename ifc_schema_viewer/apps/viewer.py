@@ -94,7 +94,8 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
                 "draggable": False,
                 "value": clss
             })
-            
+    
+    @st.fragment     
     def graph_status_subpage_display_metadata(self, node_iri, container):
         node_iri = rdflib.URIRef(node_iri)
         metadata = ""
@@ -150,7 +151,8 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             st.write(f"**{node_iri.n3(self.ifc_schema_dataset.namespace_manager)}** \n\n")
             with st.expander("元数据"):
                 st.markdown(metadata)
-                
+    
+    @st.fragment         
     def graph_status_subpage_render_class_hierarchy(self, option_to_label_visualization: bool=False):
         echarts_graph_info = {}
         echarts_graph_info["nodes"] = []
@@ -174,6 +176,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         )
         return s
     
+    @st.fragment
     def graph_status_subpage_render_property_hierarchy(self, option_to_label_visualization: bool=False):
         echarts_graph_info = {}
         echarts_graph_info["nodes"] = []
@@ -206,25 +209,23 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
     
     @st.fragment
     def graph_status_subpage_display_subgraph_info(self):
+        import math
         graphs = self.ifc_schema_dataset.graphs()
         graphs = {str(graph.identifier.n3(self.ifc_schema_dataset.namespace_manager)): graph for graph in graphs}
-        # st.write(graphs.keys())
-        # subgraph_info = {"name":[], "size":[]}
-        # for graph_name in graphs.keys():
-        #     subgraph_info["name"].append(graph_name)
-        #     subgraph_info["size"].append(len(graphs[graph_name]))
-        # subgraph_info_df = pd.DataFrame(subgraph_info)
-        # subgraph_info_df = subgraph_info_df.sort_values(by="size", ascending=False)
-        # st.dataframe(subgraph_info_df, use_container_width=True)
+        
         grid = st_grid([1,1])
         grid.metric("IFC4.3数据模式三元组数量", len(graphs["ifc:IFC_SCHEMA_GRAPH"]))
         grid.metric("IFC4.3数据模式本体三元组数量", len(graphs["<urn:x-rdflib:default>"]))
         num_in_column = 4
         
+        search_value = st.text_input("请输入查询关键词", key="search_classes")
+        
         subgraph_info = {}
         for i, graph_name in enumerate(graphs.keys()):
             if graph_name in ["ifc:IFC_SCHEMA_GRAPH", "<urn:x-rdflib:default>"]:
                 continue
+            if search_value:
+                if search_value.lower() not in graph_name.lower(): continue
             if graph_name.startswith("ifc:CC_"):
                 name = graph_name[7:][:-6].replace("_", " ")
             else:
@@ -239,13 +240,9 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
                 subgraph_info = {k: v for k, v in sorted(subgraph_info.items(), key=lambda item: item[1], reverse=True)}
             elif sort_option == "按大小(升序)":
                 subgraph_info = {k: v for k, v in sorted(subgraph_info.items(), key=lambda item: item[1])}
-            grid = st_grid(*[[1,]*num_in_column]*((len(graphs)-2)//num_in_column))
+            grid = st_grid(*[[1,]*num_in_column]*(math.ceil(1.0*len(subgraph_info)/num_in_column)))
             for i, (graph_name, size) in enumerate(subgraph_info.items()):
                 grid.metric(graph_name, size)
-                # grid.metric(name, len(graphs[graph_name]))
-            
-        
-        
         
     @st.fragment
     def graph_status_subpage_display_basic_info(self):
@@ -263,11 +260,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             ifc_schema_subgraph = graphs["ifc:IFC_SCHEMA_GRAPH"]
             grid.metric(label="IFC数据标准子图三元组数量", value=len(ifc_schema_subgraph))
             grid.container()
-            # grid.container()
-        
-        # st.write(f"Total types: {len(self.classes)}")
-        # st.write(f"Total properties: {[(prop_type, len(props)) for prop_type, props in self.properties.items()]}")
-    
+            
     @st.fragment
     def graph_status_subpage_visualization(self):
         grid = st_grid([5, 1])
