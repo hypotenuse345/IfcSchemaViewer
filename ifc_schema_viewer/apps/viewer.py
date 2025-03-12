@@ -37,6 +37,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         degrees = {}
         pred_label = predicate.n3(self.ifc_schema_dataset.namespace_manager)
         obj_range_copy = set(obj_range.copy())
+        category_map = {}
         for s, o in self.ifc_schema_dataset.subject_objects(predicate=predicate, unique=True):
             # 将RDF对象转换为缩写
             s_label = s.n3(self.ifc_schema_dataset.namespace_manager)
@@ -77,10 +78,16 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             if s_label in nodes_initiated:
                 continue
             nodes_initiated.add(s_label)
+            namespace = s_label.split(':')[0]
+            if namespace not in category_map:
+                category_map[namespace] = len(category_map)
+                echarts_graph_info["categories"].append({
+                    "name": namespace
+                })
             echarts_graph_info["nodes"].append({
                 "id": s_label,
                 "name": s_label,
-                "category": 0,
+                "category": category_map[namespace],
                 "symbol": 'circle',
                 "symbolSize":10 + np.log(refreshed_degrees[s_label]) * 7 if s_label in refreshed_degrees else 10,
                 # "symbolSize":[200, 20],
@@ -149,7 +156,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         echarts_graph_info["nodes"] = []
         echarts_graph_info["links"] = []
         echarts_graph_info["categories"] = []
-        echarts_graph_info["categories"].append({"name": "Class"})
+        # echarts_graph_info["categories"].append({"name": "Class"})
         
         # id_map = {}
         type_list = self.classes
@@ -172,7 +179,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         echarts_graph_info["nodes"] = []
         echarts_graph_info["links"] = []
         echarts_graph_info["categories"] = []
-        echarts_graph_info["categories"].append({"name": "Property"})
+        # echarts_graph_info["categories"].append({"name": "Property"})
         
         properties = self.properties
         
