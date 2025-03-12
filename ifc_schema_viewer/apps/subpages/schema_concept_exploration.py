@@ -302,7 +302,7 @@ class SchemaExplorationSubPage(SubPage):
                 f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                 PREFIX owl: <http://www.w3.org/2002/07/owl#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?member_name ?member_description
+                SELECT DISTINCT ?member_name
                 WHERE {{
                     <{select_iri}> <{ONT["hasValue"]}> ?member .
                     ?member <{ONT["name"]}> ?member_name.
@@ -316,7 +316,71 @@ class SchemaExplorationSubPage(SubPage):
                 })
             st.write(f"### {select_iri.fragment}")
             st.dataframe(select_info["members"], hide_index=True, use_container_width=True)
-                
+        
+        def display_entity_info(entity_iri, ifc_schema_graph: rdflib.Graph):
+            entity_label = entity_iri.n3(ifc_schema_graph.namespace_manager)
+            entity_info = {
+                "iri": entity_iri,
+                "name": entity_label,
+                "direct_attributes": [],
+                "inverse_attributes": []
+            }
+            results = ifc_schema_graph.query(
+                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                WHERE {{
+                    <{entity_iri}> <{ONT["hasDirectAttribute"]}> ?attr .
+                    ?attr <{ONT["name"]}> ?attr_name;
+                        <{ONT["is_optional"]}> ?optional;
+                        <{ONT["description"]}> ?description;
+                        <{ONT["direct_attr_num"]}> ?direct_attr_num;
+                        <{ONT["cardinality"]}> ?cardinality;
+                        <{ONT["attrRange"]}> ?attrRange.
+                }}"""
+            )
+            for result_row in results:
+                entity_info["direct_attributes"].append({
+                    "#": int(result_row.direct_attr_num),
+                    "attribute": result_row.attr_name,
+                    "optional": result_row.optional,
+                    "cardinality": result_row.cardinality,
+                    "attrRange": result_row.attrRange.fragment,
+                    "description": result_row.description,
+                })
+            sorted(entity_info["direct_attributes"], key=lambda x: x["#"])
+            st.write(f"### {entity_iri.fragment}")
+            st.write(f"#### Direct Attributes")
+            st.dataframe(entity_info["direct_attributes"], hide_index=True, use_container_width=True)
+            
+            results = ifc_schema_graph.query(
+                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                WHERE {{
+                    <{entity_iri}> <{ONT["hasInverseAttribute"]}> ?attr .
+                    ?attr <{ONT["name"]}> ?attr_name;
+                        <{ONT["is_optional"]}> ?optional;
+                        <{ONT["description"]}> ?description;
+                        <{ONT["cardinality"]}> ?cardinality;
+                        <{ONT["attrRange"]}> ?attrRange.
+                }}"""
+            )
+            
+            for result_row in results:
+                entity_info["inverse_attributes"].append({
+                    "#": "",
+                    "attribute": result_row.attr_name,
+                    "optional": result_row.optional,
+                    "cardinality": result_row.cardinality,
+                    "attrRange": result_row.attrRange.fragment,
+                    "description": result_row.description,
+                })
+            st.write(f"#### Inverse Attributes")
+            st.dataframe(entity_info["inverse_attributes"], hide_index=True, use_container_width=True)
+        
         
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
@@ -349,6 +413,8 @@ class SchemaExplorationSubPage(SubPage):
                         display_prop_enum(selected_obj, ifc_schema_graph)
                     elif selected_type == "express:Select":
                         display_select_info(selected_obj, ifc_schema_graph)
+                    elif selected_type == "express:Entity":
+                        display_entity_info(selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
                     
     
