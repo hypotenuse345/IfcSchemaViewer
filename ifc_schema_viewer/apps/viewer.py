@@ -254,17 +254,23 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         if selected_iri:
             self.graph_status_subpage_display_metadata(selected_iri, info_col)
     
+    def _get_namespace_category(self, a_label: str, category_map:Dict[str, int], echarts_graph_info: Dict[str, Any]):
+        namespace = a_label.split(':')[0]
+        if namespace not in category_map:
+            category_map[namespace] = len(category_map)
+            echarts_graph_info["categories"].append({
+                "name": namespace
+        })
+        return category_map[namespace]
+    
+    def _create_node_by_categorizing_namespace(self, a_label: str, category_map:Dict[str, int], echarts_graph_info: Dict[str, Any]):
+        echarts_graph_info["nodes"].append({
+            "id": a_label, "name": a_label, 
+            "category": self._get_namespace_category(a_label, category_map, echarts_graph_info)})
+
+    
     @st.fragment
     def graph_status_subpage_render_classes(self):
-        def get_namespace_category(a_label, category_map, echarts_graph_info):
-            namespace = a_label.split(':')[0]
-            if namespace not in category_map:
-                category_map[namespace] = len(category_map)
-                echarts_graph_info["categories"].append({
-                    "name": namespace
-            })
-            return category_map[namespace]
-        
         def render_selected_class_echarts(ontology_graph, class_iri, height=400):
             class_iri = rdflib.URIRef(class_iri)
             class_label = class_iri.n3(ontology_graph.namespace_manager)
@@ -275,10 +281,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             # echarts_graph_info["categories"].append({"name": "Class"})
             category_map = {}
             
-            echarts_graph_info["nodes"].append({
-                "id": class_label, "name": class_label, 
-                "category": get_namespace_category(class_label, category_map, echarts_graph_info)})
-
+            self._create_node_by_categorizing_namespace(class_label, category_map, echarts_graph_info)
             # 子类
             subclasses = ontology_graph.subjects(RDFS.subClassOf, class_iri, unique=True)
             
@@ -286,9 +289,8 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             if subclasses:
                 for subclass in subclasses:
                     subclass_label = subclass.n3(ontology_graph.namespace_manager)
-                    echarts_graph_info["nodes"].append({
-                        "id": subclass_label, "name": subclass_label, 
-                        "category": get_namespace_category(subclass_label, category_map, echarts_graph_info)})
+                    self._create_node_by_categorizing_namespace(subclass_label, category_map, echarts_graph_info)
+            
                     echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subclass_label, class_label, "rdfs:subClassOf"))
                     
             # 父类
@@ -298,10 +300,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
                     superclass_label = superclass.n3(ontology_graph.namespace_manager)
                     if superclass_label.startswith("_:"):
                         continue
-                    echarts_graph_info["nodes"].append({
-                        "id": superclass_label, "name": superclass_label, 
-                        "category": get_namespace_category(superclass_label, category_map, echarts_graph_info)
-                    })
+                    self._create_node_by_categorizing_namespace(superclass_label, category_map, echarts_graph_info)
                     echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(class_label, superclass_label, "rdfs:subClassOf"))
 
             st_echarts(EchartsUtility.create_normal_echart_options(echarts_graph_info, class_label), height=f"{height}px")
@@ -333,6 +332,111 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
                 render_selected_class_echarts(self.ifc_schema_dataset, selected_iri)
             self.graph_status_subpage_display_metadata(selected_iri, info_col) 
     
+    @st.fragment
+    def graph_status_subpage_render_properties(self):
+        def render_selected_prop_echarts(ontology_graph, prop_iri, height=400):
+            prop_iri = rdflib.URIRef(prop_iri)
+            echarts_graph_info = {}
+            
+            echarts_graph_info["nodes"] = []
+            echarts_graph_info["links"] = []
+            echarts_graph_info["categories"] = []
+            # echarts_graph_info["categories"].append({"name": "Property"})
+            # echarts_graph_info["categories"].append({"name": "Class"})
+            category_map = {}
+            
+            prop_label = prop_iri.n3(ontology_graph.namespace_manager)
+            nodes_instantiated = [prop_label]
+            self._create_node_by_categorizing_namespace(prop_label, category_map, echarts_graph_info)
+
+            # 子属性
+            subprops = ontology_graph.subjects(RDFS.subPropertyOf, prop_iri, unique=True)
+            if subprops:
+                for subprop in subprops:
+                    subprop_label = subprop.n3(ontology_graph.namespace_manager)
+                    if subprop_label not in nodes_instantiated:
+                        self._create_node_by_categorizing_namespace(subprop_label, category_map, echarts_graph_info)
+                        nodes_instantiated.append(subprop_label)
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subprop_label, prop_label, "rdfs:subPropertyOf"))
+                    
+            # 父属性
+            superprops = ontology_graph.objects(prop_iri, RDFS.subPropertyOf, unique=True)
+            if superprops:
+                for superprop in superprops:
+                    superprop_label = superprop.n3(ontology_graph.namespace_manager)
+                    if superprop_label.startswith("_:"):
+                        continue
+                    if superprop_label not in nodes_instantiated:
+                        self._create_node_by_categorizing_namespace(superprop_label, category_map, echarts_graph_info)
+                        nodes_instantiated.append(superprop_label)
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(prop_label, superprop_label, "rdfs:subPropertyOf"))
+            # echarts_graph_info["label"] = 
+            
+            # owl:inverseOf
+            inverse_of = ontology_graph.objects(prop_iri, OWL.inverseOf, unique=True)
+            # inverse_of_re = ontology_graph.subjects(OWL.inverseOf, prop_iri, unique=True)
+            if inverse_of:
+                for inverse_prop in inverse_of:
+                    inverse_prop_label = inverse_prop.n3(ontology_graph.namespace_manager)
+                    if inverse_prop_label not in nodes_instantiated:
+                        self._create_node_by_categorizing_namespace(inverse_prop_label, category_map, echarts_graph_info)
+                        nodes_instantiated.append(inverse_prop_label)
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(prop_label, inverse_prop_label, "owl:inverseOf", line_type="dashed", show_label=True, curveness=0.2))
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(inverse_prop_label, prop_label, "owl:inverseOf", line_type="dashed", show_label=True, curveness=0.2))
+            
+            # rdfs:domain
+            domains = ontology_graph.objects(prop_iri, RDFS.domain, unique=True)
+            if domains:
+                for domain in domains:
+                    domain_label = domain.n3(ontology_graph.namespace_manager)
+                    if domain_label not in nodes_instantiated:
+                        self._create_node_by_categorizing_namespace(domain_label, category_map, echarts_graph_info)
+                        nodes_instantiated.append(domain_label)
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(prop_label, domain_label, "rdfs:domain", line_type="dashed", show_label=True))
+                    
+            # rdfs:range
+            ranges = ontology_graph.objects(prop_iri, RDFS.range, unique=True)
+            if ranges:
+                for range in ranges:
+                    range_label = range.n3(ontology_graph.namespace_manager)
+                    if range_label not in nodes_instantiated:
+                        self._create_node_by_categorizing_namespace(range_label, category_map, echarts_graph_info)
+                        nodes_instantiated.append(range_label)
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(prop_label, range_label, "rdfs:range", line_type="dashed", show_label=True))
+            options = EchartsUtility.create_normal_echart_options(echarts_graph_info, prop_label)
+            st_echarts(options, height=f"{height}px")
+            # st.write(options)
+        
+        grid = st_grid([2, 1])
+        main_col, info_graph_col = grid.container(), grid.container()
+        info_col = info_graph_col.container()
+        graph_col = info_graph_col.container()
+        with main_col:
+            properties = self.properties
+            search_value = st.text_input("请输入查询关键词", key="search_props")
+            props_to_df = {"Namespace":[], "LocalName":[], "PropType":[], "URIRef":[]}
+            for prop_type in ["ObjectProperty", "DatatypeProperty", "AnnotationProperty"]:
+                for prop in properties[prop_type]:
+                    prop_label = prop.n3(self.ifc_schema_dataset.namespace_manager)
+                    if search_value and (search_value.lower() not in prop.lower() and search_value.lower() not in prop_label.lower()):
+                        continue
+                    props_to_df["Namespace"].append(prop_label.split(":")[0])
+                    props_to_df["PropType"].append(prop_type)
+                    props_to_df["LocalName"].append(prop_label)
+                    props_to_df["URIRef"].append(prop)
+            event = st.dataframe(
+                props_to_df,
+                use_container_width=True,
+                hide_index=True,
+                selection_mode="single-row",
+                on_select="rerun"
+            )
+        if event.selection["rows"]:
+            with graph_col:
+                selected_iri = props_to_df["URIRef"][event.selection["rows"][0]]
+                render_selected_prop_echarts(self.ifc_schema_dataset, selected_iri)
+            self.graph_status_subpage_display_metadata(selected_iri, info_col)
+    
     def graph_status_subpage(self):
         # 占位：边栏
         with st.sidebar:
@@ -361,7 +465,8 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
             self.graph_status_subpage_visualization()
         with maintab4.container():
             self.graph_status_subpage_render_classes()
-        
+        with maintab5.container():
+            self.graph_status_subpage_render_properties()
     
     def data_schema_concept_exploration_subpage(self):
         with st.sidebar:
