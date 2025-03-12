@@ -254,6 +254,85 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         if selected_iri:
             self.graph_status_subpage_display_metadata(selected_iri, info_col)
     
+    @st.fragment
+    def graph_status_subpage_render_classes(self):
+        def get_namespace_category(a_label, category_map, echarts_graph_info):
+            namespace = a_label.split(':')[0]
+            if namespace not in category_map:
+                category_map[namespace] = len(category_map)
+                echarts_graph_info["categories"].append({
+                    "name": namespace
+            })
+            return category_map[namespace]
+        
+        def render_selected_class_echarts(ontology_graph, class_iri, height=400):
+            class_iri = rdflib.URIRef(class_iri)
+            class_label = class_iri.n3(ontology_graph.namespace_manager)
+            echarts_graph_info = {}
+            echarts_graph_info["nodes"] = []
+            echarts_graph_info["links"] = []
+            echarts_graph_info["categories"] = []
+            # echarts_graph_info["categories"].append({"name": "Class"})
+            category_map = {}
+            
+            echarts_graph_info["nodes"].append({
+                "id": class_label, "name": class_label, 
+                "category": get_namespace_category(class_label, category_map, echarts_graph_info)})
+
+            # 子类
+            subclasses = ontology_graph.subjects(RDFS.subClassOf, class_iri, unique=True)
+            
+            # 添加节点和边
+            if subclasses:
+                for subclass in subclasses:
+                    subclass_label = subclass.n3(ontology_graph.namespace_manager)
+                    echarts_graph_info["nodes"].append({
+                        "id": subclass_label, "name": subclass_label, 
+                        "category": get_namespace_category(subclass_label, category_map, echarts_graph_info)})
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subclass_label, class_label, "rdfs:subClassOf"))
+                    
+            # 父类
+            superclasses = ontology_graph.objects(class_iri, RDFS.subClassOf, unique=True)
+            if superclasses:
+                for superclass in superclasses:
+                    superclass_label = superclass.n3(ontology_graph.namespace_manager)
+                    if superclass_label.startswith("_:"):
+                        continue
+                    echarts_graph_info["nodes"].append({
+                        "id": superclass_label, "name": superclass_label, 
+                        "category": get_namespace_category(superclass_label, category_map, echarts_graph_info)
+                    })
+                    echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(class_label, superclass_label, "rdfs:subClassOf"))
+
+            st_echarts(EchartsUtility.create_normal_echart_options(echarts_graph_info, class_label), height=f"{height}px")
+    
+        grid = st_grid([2, 1])
+        main_col, info_graph_col = grid.container(), grid.container()
+        info_col = info_graph_col.container()
+        graph_col = info_graph_col.container()
+        with main_col:
+            classes = self.classes
+
+            classes = {rec.n3(self.ifc_schema_dataset.namespace_manager): rec for rec in classes if not rec.n3(self.ifc_schema_dataset.namespace_manager).startswith("_:")}
+            search_value = st.text_input("请输入查询关键词", key="search_classes")
+            if search_value:
+                classes = {k: v for k, v in classes.items() if search_value.lower() in k.lower() or search_value.lower() in v.lower()}
+                
+            keys = list(classes.keys())
+            values = list(classes.values())
+            event = st.dataframe(
+                {"Namespace": [kk.split(":")[0] for kk in keys], "LocalName": keys, "URIRef": values},
+                use_container_width=True,
+                hide_index=True,
+                selection_mode="single-row",
+                on_select="rerun"
+            )
+        if event.selection["rows"]:
+            with graph_col:
+                selected_iri = values[event.selection["rows"][0]]
+                render_selected_class_echarts(self.ifc_schema_dataset, selected_iri)
+            self.graph_status_subpage_display_metadata(selected_iri, info_col) 
+    
     def graph_status_subpage(self):
         # 占位：边栏
         with st.sidebar:
@@ -268,25 +347,35 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         main_col = st.container()
         with main_col:
             maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
-                "📝 子图基本信息",
+                "📝 子图统计",
                 "📚 命名空间",
                 "🌐 本体可视化",
-                "📈 图谱展示", 
-                "📊 图谱分析"])
+                "🏷️ 类", 
+                "🔗 属性",])
         
         with maintab1.container():
             self.graph_status_subpage_display_subgraph_info()
         with maintab2.container():
             self.graph_status_subpage_display_namespaces()
-        
         with maintab3.container():
             self.graph_status_subpage_visualization()
+        with maintab4.container():
+            self.graph_status_subpage_render_classes()
+        
     
     def data_schema_concept_exploration_subpage(self):
         with st.sidebar:
             sidetab1, sidetab2 = st.tabs(["📝 基本信息", "👨‍💻 开发者信息"])
             
         self.display_creator_widget(sidetab2)
+        
+        # 占位： 主页面
+        main_col = st.container()
+        with main_col:
+            maintab1, maintab2, maintab3 = st.tabs([
+                "📝 子图基本信息",
+                "📈 图谱展示", 
+                "📊 图谱分析"])
         st.write("数据模式概念探索")
     
     def parse_ifc_schema_dataset(self):
@@ -369,12 +458,12 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
         with st.sidebar:
             st.header("🔍 IFC4.3 Viewer", divider=True)
             st.write("For education purposes only.")
-            # 下拉选择框的标签为“子页面导航”，选项为“图谱状态”
-            subpage_option = st.selectbox("子页面导航", ["图谱状态", "数据模式概念探索"])
+            # 下拉选择框的标签为“子页面导航”，选项为“图谱构成”
+            subpage_option = st.selectbox("子页面导航", ["图谱总体构成", "数据模式概念探索"])
             
-        # 判断用户选择的子页面是否为“图谱状态”
-        if subpage_option == "图谱状态":
-            # 如果是“图谱状态”，则调用self.graph_status_subpage()方法显示相应内容
+        # 判断用户选择的子页面是否为“图谱构成”
+        if subpage_option == "图谱总体构成":
+            # 如果是“图谱构成”，则调用self.graph_status_subpage()方法显示相应内容
             self.graph_status_subpage()
         elif subpage_option == "数据模式概念探索":
             self.data_schema_concept_exploration_subpage()
