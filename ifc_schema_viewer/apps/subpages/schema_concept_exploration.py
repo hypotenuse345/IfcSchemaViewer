@@ -236,6 +236,11 @@ class SchemaExplorationSubPage(SubPage):
             st_echarts(options, height=f"{height}px")
         
         def display_selected_individual_info(express_type, individual_iri, ifc_schema_graph: rdflib.Graph):
+            individual_fragment = individual_iri.fragment
+            container = st.expander(label=f"**{individual_fragment}**", expanded=True)
+            with container:
+                st.header(f"{individual_fragment}", divider=True)
+                mdlit(f"@({individual_fragment})(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
             def display_enum_info(enum_iri, ifc_schema_graph: rdflib.Graph):
                 enum_label = enum_iri.n3(ifc_schema_graph.namespace_manager)
                 enum_info = {
@@ -261,8 +266,8 @@ class SchemaExplorationSubPage(SubPage):
                         "enum value": result_row.member_name,
                         "description": result_row.member_description
                     })
-                st.write(f"### {enum_iri.fragment}")
-                st.dataframe(enum_info["members"], hide_index=True, use_container_width=True)
+                with container:
+                    st.dataframe(enum_info["members"], hide_index=True, use_container_width=True)
             
             def display_prop_enum(prop_enum_iri, ifc_schema_graph: rdflib.Graph):
                 prop_enum_label = prop_enum_iri.n3(ifc_schema_graph.namespace_manager)
@@ -289,8 +294,8 @@ class SchemaExplorationSubPage(SubPage):
                         "enum value": result_row.member_name,
                         "description": result_row.member_description
                     })
-                st.write(f"### {prop_enum_iri.fragment}")
-                st.dataframe(prop_enum_info["members"], hide_index=True, use_container_width=True)
+                with container:
+                    st.dataframe(prop_enum_info["members"], hide_index=True, use_container_width=True)
             
             def display_select_info(select_iri, ifc_schema_graph: rdflib.Graph):
                 select_label = select_iri.n3(ifc_schema_graph.namespace_manager)
@@ -319,8 +324,7 @@ class SchemaExplorationSubPage(SubPage):
                         "iri": result_row.member
                         # "url": f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{result_row.member_name}.htm"
                     })
-                with st.container(border=True):
-                    st.header(f"{select_iri.fragment}", divider=True)
+                with container:
                     st.write(f"#### *Select Values*")
                     selected = st.dataframe(
                         select_info["members"], hide_index=True, 
@@ -336,14 +340,91 @@ class SchemaExplorationSubPage(SubPage):
                 entity_info = {
                     "iri": entity_iri,
                     "name": entity_label,
+                    "super_entities": [],
+                    "sub_entities": [],
                     "direct_attributes": [],
                     "inverse_attributes": []
                 }
+                
+                # 父实体
                 results = ifc_schema_graph.query(
                     f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                     PREFIX owl: <http://www.w3.org/2002/07/owl#>
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                    SELECT DISTINCT ?super_entity ?super_entity_name ?definitions
+                    WHERE {{
+                        <{entity_iri}> <{ONT["subClassOf"]}>+ ?super_entity .
+                        ?super_entity <{ONT["name"]}> ?super_entity_name;
+                            <{ONT["definitions"]}> ?definitions.
+                    }}"""
+                )
+                for result_row in results:
+                    entity_info["super_entities"].append({
+                        "type": "express:Entity",
+                        "name": result_row.super_entity_name,
+                        "iri": result_row.super_entity,
+                        "definitions": result_row.definitions
+                    })
+                with container:
+                    st.write(f"#### *Super Entities*")
+                    selected_index = None
+                    if entity_info["super_entities"]:
+                        
+                        selected = st.dataframe(
+                            entity_info["super_entities"], hide_index=True, 
+                            use_container_width=True, selection_mode="single-row",
+                            on_select="rerun", column_order=["type", "name", "definitions"])
+                        if selected["selection"]["rows"]:
+                            selected_index = selected["selection"]["rows"][0]
+                    else:
+                        st.write("None")
+                        
+                        
+                if selected_index is not None:
+                    super_entity = entity_info["super_entities"][selected_index]
+                    display_selected_individual_info("express:Entity", super_entity["iri"], ifc_schema_graph)
+                        
+                # 子实体
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?sub_entity ?sub_entity_name ?definitions
+                    WHERE {{
+                        ?sub_entity <{ONT["subClassOf"]}>+ <{entity_iri}> .
+                        ?sub_entity <{ONT["name"]}> ?sub_entity_name;
+                            <{ONT["definitions"]}> ?definitions.
+                    }}"""
+                )
+                for result_row in results:
+                    entity_info["sub_entities"].append({
+                        "type": "express:Entity",
+                        "name": result_row.sub_entity_name,
+                        "iri": result_row.sub_entity,
+                        "definitions": result_row.definitions
+                    })
+                with container:
+                    selected_index = None
+                    st.write(f"#### *Sub Entities*")
+                    if entity_info["sub_entities"]:
+                        selected = st.dataframe(
+                            entity_info["sub_entities"], hide_index=True, 
+                            use_container_width=True, selection_mode="single-row",
+                            on_select="rerun", column_order=["type", "name", "definitions"])
+                        if selected["selection"]["rows"]:
+                            selected_index = selected["selection"]["rows"][0]
+                    else:
+                        st.write("None")
+                if selected_index is not None:
+                    sub_entity = entity_info["sub_entities"][selected_index]
+                    display_selected_individual_info("express:Entity", sub_entity["iri"], ifc_schema_graph)
+                
+                # 直接属性
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange ?express_type
                     WHERE {{
                         <{entity_iri}> <{ONT["hasDirectAttribute"]}> ?attr .
                         ?attr <{ONT["name"]}> ?attr_name;
@@ -352,30 +433,40 @@ class SchemaExplorationSubPage(SubPage):
                             <{ONT["direct_attr_num"]}> ?direct_attr_num;
                             <{ONT["cardinality"]}> ?cardinality;
                             <{ONT["attrRange"]}> ?attrRange.
+                        ?attrRange a ?express_type.
+                        FILTER (STRSTARTS(str(?express_type), "{ONT}"))
                     }}"""
                 )
                 for result_row in results:
                     entity_info["direct_attributes"].append({
                         "#": int(result_row.direct_attr_num),
-                        "attribute": result_row.attr_name,
-                        "optional": result_row.optional,
+                        "name": result_row.attr_name,
+                        "optional": "T" if result_row.optional else "F",
                         "cardinality": result_row.cardinality,
-                        "attrRange": result_row.attrRange.fragment,
+                        "range": result_row.attrRange.fragment,
+                        "express type": result_row.express_type.n3(ifc_schema_graph.namespace_manager),
+                        "attr datatype": result_row.attrRange,
                         "description": result_row.description,
                     })
                 sorted(entity_info["direct_attributes"], key=lambda x: x["#"])
                 
-                container = st.container(border=True)
                 with container:
-                    st.header(f"{entity_iri.fragment}", divider=True)
                     st.write(f"#### *Direct Attributes*")
-                    st.dataframe(entity_info["direct_attributes"], hide_index=True, use_container_width=True)
-                
+                    selected = st.dataframe(
+                        entity_info["direct_attributes"], hide_index=True, 
+                        use_container_width=True,
+                        column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
+                        selection_mode="single-row", on_select="rerun")
+                if selected["selection"]["rows"]:
+                    direct_attr_selected_index = selected["selection"]["rows"][0]
+                else:
+                    direct_attr_selected_index = None
+                # st.write(direct_attr_selected_index)
                 results = ifc_schema_graph.query(
                     f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                     PREFIX owl: <http://www.w3.org/2002/07/owl#>
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange ?express_type
                     WHERE {{
                         <{entity_iri}> <{ONT["hasInverseAttribute"]}> ?attr .
                         ?attr <{ONT["name"]}> ?attr_name;
@@ -383,21 +474,44 @@ class SchemaExplorationSubPage(SubPage):
                             <{ONT["description"]}> ?description;
                             <{ONT["cardinality"]}> ?cardinality;
                             <{ONT["attrRange"]}> ?attrRange.
+                        ?attrRange a ?express_type.
+                        FILTER (STRSTARTS(str(?express_type), "{ONT}"))
                     }}"""
                 )
                 
                 for result_row in results:
                     entity_info["inverse_attributes"].append({
                         "#": "",
-                        "attribute": result_row.attr_name,
-                        "optional": result_row.optional,
+                        "name": result_row.attr_name,
+                        "optional": "T" if result_row.optional else "F",
                         "cardinality": result_row.cardinality,
-                        "attrRange": result_row.attrRange.fragment,
+                        "range": result_row.attrRange.fragment,
+                        "express type": result_row.express_type.n3(ifc_schema_graph.namespace_manager),
+                        "attr datatype": result_row.attrRange,
                         "description": result_row.description,
                     })
                 with container:
                     st.write(f"#### *Inverse Attributes*")
-                    st.dataframe(entity_info["inverse_attributes"], hide_index=True, use_container_width=True)
+                    selected = st.dataframe(
+                        entity_info["inverse_attributes"], 
+                        hide_index=True, use_container_width=True,
+                        column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
+                        selection_mode="single-row", on_select="rerun",
+                        key=f"{entity_iri}_inverse_attributes"
+                    )
+                if selected["selection"]["rows"]:
+                    inverse_attr_selected_index = selected["selection"]["rows"][0]
+                else:
+                    inverse_attr_selected_index = None
+                
+                # st.write(direct_attr_selected_index)
+                if direct_attr_selected_index is not None:
+                    selected = entity_info["direct_attributes"][direct_attr_selected_index]
+                    display_selected_individual_info(selected["express type"], selected["attr datatype"], ifc_schema_graph)
+                
+                if inverse_attr_selected_index is not None:
+                    selected = entity_info["inverse_attributes"][inverse_attr_selected_index]
+                    display_selected_individual_info(selected["express type"], selected["attr datatype"], ifc_schema_graph)
             
             def display_pset_info(pset_iri, ifc_schema_graph: rdflib.Graph):
                 pset_label = pset_iri.n3(ifc_schema_graph.namespace_manager)
@@ -410,13 +524,16 @@ class SchemaExplorationSubPage(SubPage):
                     f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                     PREFIX owl: <http://www.w3.org/2002/07/owl#>
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    SELECT DISTINCT ?prop_name ?description ?data_type ?property_type
+                    SELECT DISTINCT ?prop_name ?description ?data_type ?property_type ?dataType ?express_type
                     WHERE {{
                         <{pset_iri}> <{ONT["hasPropTemplate"]}> ?prop .
                         ?prop <{ONT["name"]}> ?prop_name;
                             <{ONT["data_type"]}> ?data_type;
                             <{ONT["description"]}> ?description;
-                            <{ONT["property_type"]}> ?property_type
+                            <{ONT["property_type"]}> ?property_type;
+                            <{ONT["dataType"]}> ?dataType.
+                        ?dataType a ?express_type.
+                        FILTER (STRSTARTS(str(?express_type), "{ONT}"))
                     }}"""
                 )
                 for result_row in results:
@@ -424,12 +541,52 @@ class SchemaExplorationSubPage(SubPage):
                         "property": result_row.prop_name,
                         "property_type": result_row.property_type,
                         "data_type": result_row.data_type,
+                        "dataType": result_row.dataType,
+                        "express type": result_row.express_type.n3(ifc_schema_graph.namespace_manager),
                         "description": result_row.description,
                     })
-                st.write(f"### {pset_label}")
-                st.write(f"#### Properties")
-                st.dataframe(pset_info["props"], hide_index=True, use_container_width=True)
+                with container:
+                    st.write(f"#### *Properties*")
+                    selected = st.dataframe(
+                        pset_info["props"], hide_index=True, 
+                        use_container_width=True,
+                        column_order=["property", "property_type", "data_type", "express type", "description"],
+                        on_select="rerun", selection_mode="single-row"
+                    )
+                if selected["selection"]["rows"]:
+                    selected_index = selected["selection"]["rows"][0]
+                    prop = pset_info["props"][selected_index]
+                    display_selected_individual_info(prop["express type"], prop["dataType"], ifc_schema_graph)
 
+            def display_derived_type(individual_iri, ifc_schema_graph):
+                indi_label = individual_iri.n3(ifc_schema_graph.namespace_manager)
+                indi_info = {
+                    "iri": individual_iri,
+                    "name": indi_label,
+                    "derived from": None,
+                    "cardinality": None
+                }
+                results = ifc_schema_graph.query(
+                    f"""SELECT ?derived_from ?cardinality
+                    WHERE {{
+                        <{individual_iri}> <{ONT["derivedFrom"]}> ?derived_from;
+                            <{ONT["cardinality"]}> ?cardinality.
+                    }}
+                    """
+                )
+                for result_row in results:
+                    derived_from = result_row.derived_from
+                    cardinality = result_row.cardinality
+                    if derived_from:
+                        derived_from = derived_from.fragment
+                    indi_info["derived from"] = derived_from
+                    indi_info["cardinality"] = cardinality
+                with container:
+                    if str(indi_info['cardinality']) != "1":
+                        st.write(f"{indi_info['cardinality']} *{indi_info['derived from']}*")
+                    else:
+                        st.write(f"*{indi_info['derived from']}*")
+            
             if express_type == "express:Enum":
                 display_enum_info(individual_iri, ifc_schema_graph)
             elif express_type == "express:PropertyEnumeration":
@@ -438,8 +595,12 @@ class SchemaExplorationSubPage(SubPage):
                 display_select_info(individual_iri, ifc_schema_graph)
             elif express_type == "express:Entity":
                 display_entity_info(individual_iri, ifc_schema_graph)
-            elif express_type == "express:PropertySetTemplate":
+            elif express_type in ["express:PropertySetTemplate", "express:QuantitySetTemplate"]:
                 display_pset_info(individual_iri, ifc_schema_graph)
+            elif express_type == "express:DerivedType":
+                display_derived_type(individual_iri, ifc_schema_graph)
+            else:
+                st.write(f"Unknown express type: {express_type}")
         
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
