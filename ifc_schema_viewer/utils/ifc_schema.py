@@ -121,6 +121,8 @@ class EntityInfo(ConceptInfo):
     _sub_entities : List[Dict[str, str]] = PrivateAttr(default_factory=list)
     _direct_attributes : List[Dict[str, str]] = PrivateAttr(default_factory=list)
     _inverse_attributes : List[Dict[str, str]] = PrivateAttr(default_factory=list)
+    _pset_templates: List[Dict[str, str]] = PrivateAttr(default_factory=list)
+    
     @property
     def super_entities(self):
         return self._super_entities
@@ -133,6 +135,9 @@ class EntityInfo(ConceptInfo):
     @property
     def inverse_attributes(self):
         return self._inverse_attributes
+    @property
+    def pset_templates(self):
+        return self._pset_templates
 
     def model_post_init(self, __context):
         super().model_post_init(__context)
@@ -232,9 +237,32 @@ class EntityInfo(ConceptInfo):
                 "optional": "T" if result_row.optional else "F",
                 "cardinality": result_row.cardinality,
                 "range": result_row.attrRange.fragment,
-                "express type": result_row.express_type.n3(self.rdf_graph.namespace_manager),
+                "express type": result_row.express_type.n3(self.namespace_manager),
                 "attr datatype": result_row.attrRange,
                 "description": result_row.description,
+            })
+            
+        # 关联的属性集模板
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?pset ?pset_name ?definitions ?express_type
+            WHERE {{
+                <{self.iri}> <{ONT['subClassOf']}>* ?ae.
+                ?pset a ?express_type;
+                    <{ONT["applicableTo"]}> ?ae;
+                    <{ONT["name"]}> ?pset_name;
+                    <{ONT["definitions"]}> ?definitions.
+                FILTER (STRSTARTS(str(?express_type), "{ONT}"))
+            }}"""
+        )
+        for result_row in results:
+            self.pset_templates.append({
+                "name": result_row.pset_name,
+                "iri": result_row.pset,
+                "definitions": result_row.definitions,
+                "express type": result_row.express_type.n3(self.namespace_manager)
             })
     
     def _display_super_entities(self, container):
@@ -297,11 +325,25 @@ class EntityInfo(ConceptInfo):
             selected = self.inverse_attributes[inverse_attr_selected_index]
             IfcConceptRenderer.display_selected_individual_info(selected["express type"], selected["attr datatype"], self.rdf_graph)
     
+    def _display_pset_templates(self, container):
+        with container:
+            st.write(f"#### *Pset Templates*")
+            selected = st.dataframe(
+                self.pset_templates, hide_index=True, 
+                use_container_width=True,
+                column_order=["name", "express type", "definitions"],
+                selection_mode="single-row", on_select="rerun")
+        if selected["selection"]["rows"]:
+            selected_index = selected["selection"]["rows"][0]
+            selected = self.pset_templates[selected_index]
+            IfcConceptRenderer.display_selected_individual_info(selected["express type"], selected["iri"], self.rdf_graph)
+
     def display(self, container):
         self._display_super_entities(container)
         self._display_sub_entities(container)
         self._display_direct_attributes(container)
         self._display_inverse_attributes(container)
+        self._display_pset_templates(container)
 
 class PsetInfo(ConceptInfo):
     _express_type: str = PrivateAttr("express:PropertySetTemplate")
@@ -328,8 +370,8 @@ class PsetInfo(ConceptInfo):
                 ?prop <{ONT["name"]}> ?prop_name;
                     <{ONT["data_type"]}> ?data_type;
                     <{ONT["description"]}> ?description;
-                    <{ONT["property_type"]}> ?property_type;
                     <{ONT["dataType"]}> ?dataType.
+                OPTIONAL {{?prop <{ONT["property_type"]}> ?property_type.}}
                 ?dataType a ?express_type.
                 FILTER (STRSTARTS(str(?express_type), "{ONT}"))
             }}"""
@@ -350,7 +392,8 @@ class PsetInfo(ConceptInfo):
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             SELECT DISTINCT ?applicable_entity
             WHERE {{
-                <{self.iri}> <{ONT["applicableTo"]}> ?applicable_entity.
+                <{self.iri}> <{ONT["applicableTo"]}> ?ae.
+                ?ae <{ONT["superClassOf"]}>* ?applicable_entity.
             }}"""
         )
         for result_row in results:
