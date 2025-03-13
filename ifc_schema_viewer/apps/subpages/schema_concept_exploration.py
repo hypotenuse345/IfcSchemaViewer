@@ -87,73 +87,9 @@ class SchemaExplorationSubPage(SubPage):
     
     @st.fragment
     def display_concept_groups_widget(self):
-        def get_data_schemas(root_node, ifc_schema_graph: rdflib.Graph):
-            results = ifc_schema_graph.query(f"""
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-            SELECT ?data_schema ?ds_name WHERE
-            {{
-                ?data_schema rdf:type <{ONT["Layer"]}> ;
-                    skos:inScheme <{root_node}>;
-                    <{ONT["name"]}> ?ds_name.
-            }}""")
-            return {result_row["ds_name"]: result_row["data_schema"] for result_row in results}
-        
-        def get_conceptual_groups(layer_node, ifc_schema_graph: rdflib.Graph):
-            results = ifc_schema_graph.query(f"""
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-            SELECT ?conceptual_group ?cg_name ?cg_definitions WHERE
-            {{
-                ?conceptual_group rdf:type <{ONT["Group"]}> ;
-                    <{ONT["name"]}> ?cg_name;
-                    <{ONT["definitions"]}> ?cg_definitions.
-                <{layer_node}> <{ONT["hasConceptualGroup"]}> ?conceptual_group.
-            }}""")
-            return {result_row["cg_name"]: 
-                {"iri":result_row["conceptual_group"], "definitions":result_row["cg_definitions"]} for result_row in results}
-        
-        def get_concepts(conceptual_group_node, ifc_schema_graph: rdflib.Graph):
-            results = ifc_schema_graph.query(f"""
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-            PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
-            PREFIX owl: <http://www.w3.org/2002/07/owl#>
-            SELECT ?concept ?concept_name ?concept_type ?concept_definitions WHERE
-            {{
-                GRAPH ifc:IFC_SCHEMA_GRAPH {{
-                    ?concept rdf:type ?concept_type ;
-                        <{ONT["name"]}> ?concept_name;
-                        <{ONT["definitions"]}> ?concept_definitions.
-                    <{conceptual_group_node}> ?pred ?concept.
-                    FILTER (?concept_type != owl:Class)
-                }}
-                ?pred rdfs:subPropertyOf* <{ONT["hasConcept"]}>.
-            }}""")
-            concepts_4_df = {
-                "type": [],
-                "name": [],
-                "iri": [],
-                "definitions": []
-            }
-            for result_row in results:
-                concepts_4_df["iri"].append(result_row["concept"])
-                concepts_4_df["name"].append(result_row["concept_name"])
-                concepts_4_df["type"].append(result_row["concept_type"].n3(ifc_schema_graph.namespace_manager))
-                concepts_4_df["definitions"].append(result_row["concept_definitions"])
-            
-            return concepts_4_df
-        
         def replace_ifc_concept_to_link(match):
-            # import requests
-            # Testing the URL
             url = f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{match.group(0)}.htm"
             return f"[{match.group(0)}]({url})"
-            # response = requests.get(url)
-            # if response.status_code == 200:
-            #     return f"[{match.group(0)}]({url})"
-            # else:
-            #     return f"[{match.group(0)}](https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/{match.group(0).lower()}/content.html)"
             
         def display_conceptual_group_info(selected_conceptual_group, conceptual_groups, container):
             name = selected_conceptual_group
@@ -166,7 +102,6 @@ class SchemaExplorationSubPage(SubPage):
                 mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
         
         def display_concept_info(selected_concept, concept_type, definitions, container):
-            
             with container.popover(f"**{selected_concept}** 元数据", use_container_width=True):
                 mdlit(f"**{selected_concept}** @(更多信息)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                 mdlit(f"**{concept_type}**")
@@ -174,80 +109,18 @@ class SchemaExplorationSubPage(SubPage):
                 pattern = r'Ifc\w+'
                 mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
         
-        def render_selected_instance_echarts(ontology_graph: rdflib.Graph, instance_iri, height=400):
-            instance_iri = rdflib.URIRef(instance_iri)
-            echarts_graph_info = {"nodes":[], "links":[]}
-            echarts_graph_info["categories"] = []
-            echarts_graph_info["categories"].append({"name": "Instance"})
-            echarts_graph_info["categories"].append({"name": "Class"})
-            echarts_graph_info["categories"].append({"name": "Undefined"})
-            
-            category_map = {"Undefined": 2}
-            
-            instance_label = instance_iri.n3(ontology_graph.namespace_manager)
-            nodes_instantiated = [instance_label]
-            echarts_graph_info["nodes"].append({
-                "id": instance_label, "name": instance_label, "category": 0})
-            
-            # 正向关系
-            for pred, obj in ontology_graph.predicate_objects(instance_iri):
-                if isinstance(obj, rdflib.Literal):
-                    continue
-                pred_label = pred.n3(ontology_graph.namespace_manager)
-                obj_label = obj.n3(ontology_graph.namespace_manager)
-                if obj_label not in nodes_instantiated:
-                    if pred == RDF.type:
-                        echarts_graph_info["nodes"].append({
-                            "id": obj_label, "name": obj_label, "category": 1})
-                    else:
-                        try:
-                            obj_type = [ii for ii in list(ontology_graph.objects(obj, RDF.type)) if ii!=OWL.NamedIndividual][0]
-                            obj_type = obj_type.n3(ontology_graph.namespace_manager)
-                            if obj_type not in category_map:
-                                category_map[obj_type] = len(echarts_graph_info["categories"])
-                                echarts_graph_info["categories"].append({"name": obj_type})
-                        except:
-                            obj_type = "Undefined"
-                        echarts_graph_info["nodes"].append({
-                            "id": obj_label, "name": obj_label, "category": category_map[obj_type]
-                        })
-                        
-                    nodes_instantiated.append(obj_label)
-                echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(instance_label, obj_label, pred_label, line_type="dashed", show_label=True))
-                
-            # 反向关系
-            for subj, pred in ontology_graph.subject_predicates(instance_iri):
-                pred_label = pred.n3(ontology_graph.namespace_manager)
-                subj_label = subj.n3(ontology_graph.namespace_manager)
-                if subj_label not in nodes_instantiated:
-                    try:
-                        subj_type = [ii for ii in list(ontology_graph.objects(subj, RDF.type)) if ii!=OWL.NamedIndividual][0]
-                        subj_type = subj_type.n3(ontology_graph.namespace_manager)
-                        if subj_type not in category_map:
-                            category_map[subj_type] = len(echarts_graph_info["categories"])
-                            echarts_graph_info["categories"].append({"name": subj_type})
-                    except:
-                        subj_type = "Undefined"
-                    echarts_graph_info["nodes"].append({
-                        "id": subj_label, "name": subj_label, "category": category_map[subj_type]
-                    })
-                echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subj_label, instance_label, pred_label, line_type="dashed", show_label=True))
-            options = EchartsUtility.create_normal_echart_options(echarts_graph_info, instance_label.split(":")[1])
-            st_echarts(options, height=f"{height}px")
-        
-        
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
         for root_node in ifc_schema_graph.subjects(RDF.type, ONT["IfcSchema"], unique=True):
-            data_schemas = get_data_schemas(root_node, ifc_schema_graph)
+            data_schemas = IfcConceptRenderer.get_data_schemas(root_node, ifc_schema_graph)
             grid = st_grid([1,1])
             main_col, info_graph_col = grid.container(), grid.container()
             with main_col:
                 selected_layer = st.selectbox("概念层", options=data_schemas.keys())
-                conceptual_groups = get_conceptual_groups(data_schemas[selected_layer], ifc_schema_graph)
+                conceptual_groups = IfcConceptRenderer.get_conceptual_groups(data_schemas[selected_layer], ifc_schema_graph)
                 selected_conceptual_group = st.selectbox("概念组", options=conceptual_groups.keys())
                 display_conceptual_group_info(selected_conceptual_group, conceptual_groups, info_graph_col)
-                concepts = get_concepts(conceptual_groups[selected_conceptual_group]["iri"], self.ifc_schema_dataset)
+                concepts = IfcConceptRenderer.get_concepts(conceptual_groups[selected_conceptual_group]["iri"], self.ifc_schema_dataset)
                 selected_obj = st.dataframe(
                     concepts, hide_index=True, use_container_width=True, on_select="rerun",
                     selection_mode="single-row", column_order=["type", "name", "definitions"]
@@ -258,12 +131,15 @@ class SchemaExplorationSubPage(SubPage):
                     selected_concept = selected_obj.fragment
                     mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                     display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
-                    render_selected_instance_echarts(ifc_schema_graph, selected_obj, height=600)
+                    IfcConceptRenderer.render_selected_instance_echarts(selected_obj, ifc_schema_graph, height=600)
                     selected_type = concepts["type"][selected_index]
                     with info_graph_col:
                         IfcConceptRenderer.display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
-                    
+    
+    def display_property_sets_info_widget(self):
+        pass
+    
     
     def render(self):
         with st.sidebar:
@@ -279,7 +155,7 @@ class SchemaExplorationSubPage(SubPage):
         with main_col:
             maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
                 "📝 按概念组查看",
-                "📚 占位",
+                "📚 按属性集查看",
                 "🌐 占位",
                 "🏷️ 占位", 
                 "🔗 占位",])

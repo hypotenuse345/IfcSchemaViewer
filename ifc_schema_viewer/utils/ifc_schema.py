@@ -1,9 +1,13 @@
 import rdflib
+from rdflib import RDF, RDFS, OWL
 import streamlit as st
+from streamlit_echarts import st_echarts
 from streamlit_extras.markdownlit import mdlit
 
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
+
+from .echarts import EchartsUtility
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
 
@@ -302,9 +306,14 @@ class EntityInfo(ConceptInfo):
 class PsetInfo(ConceptInfo):
     _express_type: str = PrivateAttr("express:PropertySetTemplate")
     _props: List[Dict[str, str]] = PrivateAttr(default_factory=list)
+    _applicable_entities: List[str] = PrivateAttr(default_factory=list)
     @property
     def props(self):
         return self._props
+    
+    @property
+    def applicable_entities(self):
+        return self._applicable_entities
     
     def model_post_init(self, __context):
         super().model_post_init(__context)
@@ -334,6 +343,18 @@ class PsetInfo(ConceptInfo):
                 "express type": result_row.express_type.n3(self.rdf_graph.namespace_manager),
                 "description": result_row.description,
             })
+            
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?applicable_entity
+            WHERE {{
+                <{self.iri}> <{ONT["applicableTo"]}> ?applicable_entity.
+            }}"""
+        )
+        for result_row in results:
+            self.applicable_entities.append(result_row.applicable_entity)
     
     def display(self, container):
         with container:
@@ -348,6 +369,19 @@ class PsetInfo(ConceptInfo):
             selected_index = selected["selection"]["rows"][0]
             prop = self.props[selected_index]
             IfcConceptRenderer.display_selected_individual_info(prop["express type"], prop["dataType"], self.rdf_graph)
+            
+        with container:
+            st.write(f"#### *Applicable entities*")
+            selected = st.dataframe(
+                {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True, 
+                use_container_width=True,
+                on_select="rerun", selection_mode="single-row"
+            )
+        if selected["selection"]["rows"]:
+            selected_index = selected["selection"]["rows"][0]
+            entity = self.applicable_entities[selected_index]
+            IfcConceptRenderer.display_selected_individual_info("express:Entity", entity, self.rdf_graph)
+            
 
 class QsetInfo(PsetInfo):
     _express_type: str = PrivateAttr("express:QuantitySetTemplate")
@@ -404,6 +438,65 @@ concept_info_map: Dict[str, Type[ConceptInfo]] = {
 }
         
 class IfcConceptRenderer:
+    """Utility class for rendering IFC concepts"""
+    @staticmethod
+    def get_data_schemas(root_node, ifc_schema_graph: rdflib.Graph):
+        results = ifc_schema_graph.query(f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+        SELECT ?data_schema ?ds_name WHERE
+        {{
+            ?data_schema rdf:type <{ONT["Layer"]}> ;
+                skos:inScheme <{root_node}>;
+                <{ONT["name"]}> ?ds_name.
+        }}""")
+        return {result_row["ds_name"]: result_row["data_schema"] for result_row in results}
+    
+    @staticmethod
+    def get_conceptual_groups(layer_node, ifc_schema_graph: rdflib.Graph):
+        results = ifc_schema_graph.query(f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+        SELECT ?conceptual_group ?cg_name ?cg_definitions WHERE
+        {{
+            ?conceptual_group rdf:type <{ONT["Group"]}> ;
+                <{ONT["name"]}> ?cg_name;
+                <{ONT["definitions"]}> ?cg_definitions.
+            <{layer_node}> <{ONT["hasConceptualGroup"]}> ?conceptual_group.
+        }}""")
+        return {result_row["cg_name"]: 
+            {"iri":result_row["conceptual_group"], "definitions":result_row["cg_definitions"]} for result_row in results}
+        
+    def get_concepts(conceptual_group_node, ifc_schema_graph: rdflib.Graph):
+        results = ifc_schema_graph.query(f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+        PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        SELECT ?concept ?concept_name ?concept_type ?concept_definitions WHERE
+        {{
+            GRAPH ifc:IFC_SCHEMA_GRAPH {{
+                ?concept rdf:type ?concept_type ;
+                    <{ONT["name"]}> ?concept_name;
+                    <{ONT["definitions"]}> ?concept_definitions.
+                <{conceptual_group_node}> ?pred ?concept.
+                FILTER (?concept_type != owl:Class)
+            }}
+            ?pred rdfs:subPropertyOf* <{ONT["hasConcept"]}>.
+        }}""")
+        concepts_4_df = {
+            "type": [],
+            "name": [],
+            "iri": [],
+            "definitions": []
+        }
+        for result_row in results:
+            concepts_4_df["iri"].append(result_row["concept"])
+            concepts_4_df["name"].append(result_row["concept_name"])
+            concepts_4_df["type"].append(result_row["concept_type"].n3(ifc_schema_graph.namespace_manager))
+            concepts_4_df["definitions"].append(result_row["concept_definitions"])
+        
+        return concepts_4_df
     
     @staticmethod
     def display_selected_individual_info(express_type, individual_iri, ifc_schema_graph: rdflib.Graph):
@@ -423,4 +516,63 @@ class IfcConceptRenderer:
         
         concept_info.display(container)
         
+    def render_selected_instance_echarts(instance_iri, ontology_graph: rdflib.Graph, height=400):
+        instance_iri = rdflib.URIRef(instance_iri)
+        echarts_graph_info = {"nodes":[], "links":[]}
+        echarts_graph_info["categories"] = []
+        echarts_graph_info["categories"].append({"name": "Instance"})
+        echarts_graph_info["categories"].append({"name": "Class"})
+        echarts_graph_info["categories"].append({"name": "Undefined"})
+        
+        category_map = {"Undefined": 2}
+        
+        instance_label = instance_iri.n3(ontology_graph.namespace_manager)
+        nodes_instantiated = [instance_label]
+        echarts_graph_info["nodes"].append({
+            "id": instance_label, "name": instance_label, "category": 0})
+        
+        # 正向关系
+        for pred, obj in ontology_graph.predicate_objects(instance_iri):
+            if isinstance(obj, rdflib.Literal):
+                continue
+            pred_label = pred.n3(ontology_graph.namespace_manager)
+            obj_label = obj.n3(ontology_graph.namespace_manager)
+            if obj_label not in nodes_instantiated:
+                if pred == RDF.type:
+                    echarts_graph_info["nodes"].append({
+                        "id": obj_label, "name": obj_label, "category": 1})
+                else:
+                    try:
+                        obj_type = [ii for ii in list(ontology_graph.objects(obj, RDF.type)) if ii!=OWL.NamedIndividual][0]
+                        obj_type = obj_type.n3(ontology_graph.namespace_manager)
+                        if obj_type not in category_map:
+                            category_map[obj_type] = len(echarts_graph_info["categories"])
+                            echarts_graph_info["categories"].append({"name": obj_type})
+                    except:
+                        obj_type = "Undefined"
+                    echarts_graph_info["nodes"].append({
+                        "id": obj_label, "name": obj_label, "category": category_map[obj_type]
+                    })
+                    
+                nodes_instantiated.append(obj_label)
+            echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(instance_label, obj_label, pred_label, line_type="dashed", show_label=True))
             
+        # 反向关系
+        for subj, pred in ontology_graph.subject_predicates(instance_iri):
+            pred_label = pred.n3(ontology_graph.namespace_manager)
+            subj_label = subj.n3(ontology_graph.namespace_manager)
+            if subj_label not in nodes_instantiated:
+                try:
+                    subj_type = [ii for ii in list(ontology_graph.objects(subj, RDF.type)) if ii!=OWL.NamedIndividual][0]
+                    subj_type = subj_type.n3(ontology_graph.namespace_manager)
+                    if subj_type not in category_map:
+                        category_map[subj_type] = len(echarts_graph_info["categories"])
+                        echarts_graph_info["categories"].append({"name": subj_type})
+                except:
+                    subj_type = "Undefined"
+                echarts_graph_info["nodes"].append({
+                    "id": subj_label, "name": subj_label, "category": category_map[subj_type]
+                })
+            echarts_graph_info["links"].append(EchartsUtility.create_normal_edge(subj_label, instance_label, pred_label, line_type="dashed", show_label=True))
+        options = EchartsUtility.create_normal_echart_options(echarts_graph_info, instance_label.split(":")[1])
+        st_echarts(options, height=f"{height}px")
