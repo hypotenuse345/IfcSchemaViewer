@@ -158,7 +158,7 @@ class SchemaExplorationSubPage(SubPage):
         def display_conceptual_group_info(selected_conceptual_group, conceptual_groups, container):
             name = selected_conceptual_group
             selected_conceptual_group = conceptual_groups[selected_conceptual_group]
-            with container.popover("当前概念组元数据", use_container_width=True):
+            with container.popover(f"**{name}** 元数据", use_container_width=True):
                 mdlit(f"**{name}** @(更多信息)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/{name.lower()}/content.html)")
                 # mdlit(f"- **iri**: {selected_conceptual_group['iri']}")
                 definitions = selected_conceptual_group["definitions"].replace("\n", "\n\n")
@@ -167,7 +167,7 @@ class SchemaExplorationSubPage(SubPage):
         
         def display_concept_info(selected_concept, concept_type, definitions, container):
             
-            with container.popover("当前概念元数据", use_container_width=True):
+            with container.popover(f"**{selected_concept}** 元数据", use_container_width=True):
                 mdlit(f"**{selected_concept}** @(更多信息)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                 mdlit(f"**{concept_type}**")
                 definitions = definitions.replace("\n", "\n\n")
@@ -235,158 +235,217 @@ class SchemaExplorationSubPage(SubPage):
             options = EchartsUtility.create_normal_echart_options(echarts_graph_info, instance_label.split(":")[1])
             st_echarts(options, height=f"{height}px")
         
-        def display_enum_info(enum_iri, ifc_schema_graph: rdflib.Graph):
-            enum_label = enum_iri.n3(ifc_schema_graph.namespace_manager)
-            enum_info = {
-                "iri": enum_iri,
-                "name": enum_label,
-                "members": []
-            }
-            results = ifc_schema_graph.query(
-                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?member_name ?member_description
-                WHERE {{
-                    <{enum_iri}> <{ONT["hasValue"]}> ?member .
-                    ?member a <{ONT["EnumValue"]}>;
-                        <{ONT["name"]}> ?member_name;
-                        <{ONT["description"]}> ?member_description.
-                }}
-                """
-            )
-            for result_row in results:
-                enum_info["members"].append({
-                    "enum value": result_row.member_name,
-                    "description": result_row.member_description
-                })
-            st.write(f"### {enum_iri.fragment}")
-            st.dataframe(enum_info["members"], hide_index=True, use_container_width=True)
-        
-        def display_prop_enum(prop_enum_iri, ifc_schema_graph: rdflib.Graph):
-            prop_enum_label = prop_enum_iri.n3(ifc_schema_graph.namespace_manager)
-            prop_enum_info = {
-                "iri": prop_enum_iri,
-                "name": prop_enum_label,
-                "members": []
-            }
-            results = ifc_schema_graph.query(
-                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?member_name ?member_description
-                WHERE {{
-                    <{prop_enum_iri}> <{ONT["hasValue"]}> ?member .
-                    ?member a <{ONT["EnumValue"]}>;
-                        <{ONT["name"]}> ?member_name;
-                        <{ONT["description"]}> ?member_description.
-                }}
-                """
-            )
-            for result_row in results:
-                prop_enum_info["members"].append({
-                    "enum value": result_row.member_name,
-                    "description": result_row.member_description
-                })
-            st.write(f"### {prop_enum_iri.fragment}")
-            st.dataframe(prop_enum_info["members"], hide_index=True, use_container_width=True)
-        
-        def display_select_info(select_iri, ifc_schema_graph: rdflib.Graph):
-            select_label = select_iri.n3(ifc_schema_graph.namespace_manager)
-            select_info = {
-                "iri": select_iri,
-                "name": select_label,
-                "members": []
-            }
-            results = ifc_schema_graph.query(
-                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?member_name
-                WHERE {{
-                    <{select_iri}> <{ONT["hasValue"]}> ?member .
-                    ?member <{ONT["name"]}> ?member_name.
-                }}
-                """
-            )
-            for result_row in results:
-                select_info["members"].append({
-                    "select value": result_row.member_name,
-                    "url": f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{result_row.member_name}.htm"
-                })
-            st.write(f"### {select_iri.fragment}")
-            st.dataframe(select_info["members"], hide_index=True, use_container_width=True)
-        
-        def display_entity_info(entity_iri, ifc_schema_graph: rdflib.Graph):
-            entity_label = entity_iri.n3(ifc_schema_graph.namespace_manager)
-            entity_info = {
-                "iri": entity_iri,
-                "name": entity_label,
-                "direct_attributes": [],
-                "inverse_attributes": []
-            }
-            results = ifc_schema_graph.query(
-                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
-                WHERE {{
-                    <{entity_iri}> <{ONT["hasDirectAttribute"]}> ?attr .
-                    ?attr <{ONT["name"]}> ?attr_name;
-                        <{ONT["is_optional"]}> ?optional;
-                        <{ONT["description"]}> ?description;
-                        <{ONT["direct_attr_num"]}> ?direct_attr_num;
-                        <{ONT["cardinality"]}> ?cardinality;
-                        <{ONT["attrRange"]}> ?attrRange.
-                }}"""
-            )
-            for result_row in results:
-                entity_info["direct_attributes"].append({
-                    "#": int(result_row.direct_attr_num),
-                    "attribute": result_row.attr_name,
-                    "optional": result_row.optional,
-                    "cardinality": result_row.cardinality,
-                    "attrRange": result_row.attrRange.fragment,
-                    "description": result_row.description,
-                })
-            sorted(entity_info["direct_attributes"], key=lambda x: x["#"])
-            st.write(f"### {entity_iri.fragment}")
-            st.write(f"#### Direct Attributes")
-            st.dataframe(entity_info["direct_attributes"], hide_index=True, use_container_width=True)
+        def display_selected_individual_info(express_type, individual_iri, ifc_schema_graph: rdflib.Graph):
+            def display_enum_info(enum_iri, ifc_schema_graph: rdflib.Graph):
+                enum_label = enum_iri.n3(ifc_schema_graph.namespace_manager)
+                enum_info = {
+                    "iri": enum_iri,
+                    "name": enum_label,
+                    "members": []
+                }
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?member_name ?member_description
+                    WHERE {{
+                        <{enum_iri}> <{ONT["hasValue"]}> ?member .
+                        ?member a <{ONT["EnumValue"]}>;
+                            <{ONT["name"]}> ?member_name;
+                            <{ONT["description"]}> ?member_description.
+                    }}
+                    """
+                )
+                for result_row in results:
+                    enum_info["members"].append({
+                        "enum value": result_row.member_name,
+                        "description": result_row.member_description
+                    })
+                st.write(f"### {enum_iri.fragment}")
+                st.dataframe(enum_info["members"], hide_index=True, use_container_width=True)
             
-            results = ifc_schema_graph.query(
-                f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                PREFIX owl: <http://www.w3.org/2002/07/owl#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
-                WHERE {{
-                    <{entity_iri}> <{ONT["hasInverseAttribute"]}> ?attr .
-                    ?attr <{ONT["name"]}> ?attr_name;
-                        <{ONT["is_optional"]}> ?optional;
-                        <{ONT["description"]}> ?description;
-                        <{ONT["cardinality"]}> ?cardinality;
-                        <{ONT["attrRange"]}> ?attrRange.
-                }}"""
-            )
+            def display_prop_enum(prop_enum_iri, ifc_schema_graph: rdflib.Graph):
+                prop_enum_label = prop_enum_iri.n3(ifc_schema_graph.namespace_manager)
+                prop_enum_info = {
+                    "iri": prop_enum_iri,
+                    "name": prop_enum_label,
+                    "members": []
+                }
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?member_name ?member_description
+                    WHERE {{
+                        <{prop_enum_iri}> <{ONT["hasValue"]}> ?member .
+                        ?member a <{ONT["EnumValue"]}>;
+                            <{ONT["name"]}> ?member_name;
+                            <{ONT["description"]}> ?member_description.
+                    }}
+                    """
+                )
+                for result_row in results:
+                    prop_enum_info["members"].append({
+                        "enum value": result_row.member_name,
+                        "description": result_row.member_description
+                    })
+                st.write(f"### {prop_enum_iri.fragment}")
+                st.dataframe(prop_enum_info["members"], hide_index=True, use_container_width=True)
             
-            for result_row in results:
-                entity_info["inverse_attributes"].append({
-                    "#": "",
-                    "attribute": result_row.attr_name,
-                    "optional": result_row.optional,
-                    "cardinality": result_row.cardinality,
-                    "attrRange": result_row.attrRange.fragment,
-                    "description": result_row.description,
-                })
-            st.write(f"#### Inverse Attributes")
-            st.dataframe(entity_info["inverse_attributes"], hide_index=True, use_container_width=True)
-        
+            def display_select_info(select_iri, ifc_schema_graph: rdflib.Graph):
+                select_label = select_iri.n3(ifc_schema_graph.namespace_manager)
+                select_info = {
+                    "iri": select_iri,
+                    "name": select_label,
+                    "members": []
+                }
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?member ?member_name ?express_type
+                    WHERE {{
+                        <{select_iri}> <{ONT["hasValue"]}> ?member .
+                        ?member <{ONT["name"]}> ?member_name;
+                            a ?express_type.
+                        FILTER (STRSTARTS(str(?express_type), "{ONT}"))
+                    }}
+                    """
+                )
+                for result_row in results:
+                    select_info["members"].append({
+                        "select value": result_row.member_name,
+                        "express type": result_row.express_type.n3(ifc_schema_graph.namespace_manager),
+                        "iri": result_row.member
+                        # "url": f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{result_row.member_name}.htm"
+                    })
+                with st.container(border=True):
+                    st.header(f"{select_iri.fragment}", divider=True)
+                    st.write(f"#### *Select Values*")
+                    selected = st.dataframe(
+                        select_info["members"], hide_index=True, 
+                        use_container_width=True, selection_mode="single-row",
+                        on_select="rerun", column_order=["select value", "express type"])
+                if selected["selection"]["rows"]:
+                    selected_index = selected["selection"]["rows"][0]
+                    member = select_info["members"][selected_index]
+                    display_selected_individual_info(member["express type"], member["iri"], ifc_schema_graph)
+            
+            def display_entity_info(entity_iri, ifc_schema_graph: rdflib.Graph):
+                entity_label = entity_iri.n3(ifc_schema_graph.namespace_manager)
+                entity_info = {
+                    "iri": entity_iri,
+                    "name": entity_label,
+                    "direct_attributes": [],
+                    "inverse_attributes": []
+                }
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                    WHERE {{
+                        <{entity_iri}> <{ONT["hasDirectAttribute"]}> ?attr .
+                        ?attr <{ONT["name"]}> ?attr_name;
+                            <{ONT["is_optional"]}> ?optional;
+                            <{ONT["description"]}> ?description;
+                            <{ONT["direct_attr_num"]}> ?direct_attr_num;
+                            <{ONT["cardinality"]}> ?cardinality;
+                            <{ONT["attrRange"]}> ?attrRange.
+                    }}"""
+                )
+                for result_row in results:
+                    entity_info["direct_attributes"].append({
+                        "#": int(result_row.direct_attr_num),
+                        "attribute": result_row.attr_name,
+                        "optional": result_row.optional,
+                        "cardinality": result_row.cardinality,
+                        "attrRange": result_row.attrRange.fragment,
+                        "description": result_row.description,
+                    })
+                sorted(entity_info["direct_attributes"], key=lambda x: x["#"])
+                
+                container = st.container(border=True)
+                with container:
+                    st.header(f"{entity_iri.fragment}", divider=True)
+                    st.write(f"#### *Direct Attributes*")
+                    st.dataframe(entity_info["direct_attributes"], hide_index=True, use_container_width=True)
+                
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?attr_name ?description ?optional ?direct_attr_num ?cardinality ?attrRange
+                    WHERE {{
+                        <{entity_iri}> <{ONT["hasInverseAttribute"]}> ?attr .
+                        ?attr <{ONT["name"]}> ?attr_name;
+                            <{ONT["is_optional"]}> ?optional;
+                            <{ONT["description"]}> ?description;
+                            <{ONT["cardinality"]}> ?cardinality;
+                            <{ONT["attrRange"]}> ?attrRange.
+                    }}"""
+                )
+                
+                for result_row in results:
+                    entity_info["inverse_attributes"].append({
+                        "#": "",
+                        "attribute": result_row.attr_name,
+                        "optional": result_row.optional,
+                        "cardinality": result_row.cardinality,
+                        "attrRange": result_row.attrRange.fragment,
+                        "description": result_row.description,
+                    })
+                with container:
+                    st.write(f"#### *Inverse Attributes*")
+                    st.dataframe(entity_info["inverse_attributes"], hide_index=True, use_container_width=True)
+            
+            def display_pset_info(pset_iri, ifc_schema_graph: rdflib.Graph):
+                pset_label = pset_iri.n3(ifc_schema_graph.namespace_manager)
+                pset_info = {
+                    "iri": pset_iri,
+                    "label": pset_label,
+                    "props": [],
+                }
+                results = ifc_schema_graph.query(
+                    f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                    PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT DISTINCT ?prop_name ?description ?data_type ?property_type
+                    WHERE {{
+                        <{pset_iri}> <{ONT["hasPropTemplate"]}> ?prop .
+                        ?prop <{ONT["name"]}> ?prop_name;
+                            <{ONT["data_type"]}> ?data_type;
+                            <{ONT["description"]}> ?description;
+                            <{ONT["property_type"]}> ?property_type
+                    }}"""
+                )
+                for result_row in results:
+                    pset_info["props"].append({
+                        "property": result_row.prop_name,
+                        "property_type": result_row.property_type,
+                        "data_type": result_row.data_type,
+                        "description": result_row.description,
+                    })
+                st.write(f"### {pset_label}")
+                st.write(f"#### Properties")
+                st.dataframe(pset_info["props"], hide_index=True, use_container_width=True)
+
+            if express_type == "express:Enum":
+                display_enum_info(individual_iri, ifc_schema_graph)
+            elif express_type == "express:PropertyEnumeration":
+                display_prop_enum(individual_iri, ifc_schema_graph)
+            elif express_type == "express:Select":
+                display_select_info(individual_iri, ifc_schema_graph)
+            elif express_type == "express:Entity":
+                display_entity_info(individual_iri, ifc_schema_graph)
+            elif express_type == "express:PropertySetTemplate":
+                display_pset_info(individual_iri, ifc_schema_graph)
         
         ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
         for root_node in ifc_schema_graph.subjects(RDF.type, ONT["IfcSchema"], unique=True):
             data_schemas = get_data_schemas(root_node, ifc_schema_graph)
-            grid = st_grid([2,1])
+            grid = st_grid([1,1])
             main_col, info_graph_col = grid.container(), grid.container()
             with main_col:
                 selected_layer = st.selectbox("概念层", options=data_schemas.keys())
@@ -404,17 +463,10 @@ class SchemaExplorationSubPage(SubPage):
                     selected_concept = selected_obj.fragment
                     mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                     display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
-                    with info_graph_col:
-                        render_selected_instance_echarts(ifc_schema_graph, selected_obj)
+                    render_selected_instance_echarts(ifc_schema_graph, selected_obj, height=600)
                     selected_type = concepts["type"][selected_index]
-                    if selected_type == "express:Enum":
-                        display_enum_info(selected_obj, ifc_schema_graph)
-                    elif selected_type == "express:PropertyEnumeration":
-                        display_prop_enum(selected_obj, ifc_schema_graph)
-                    elif selected_type == "express:Select":
-                        display_select_info(selected_obj, ifc_schema_graph)
-                    elif selected_type == "express:Entity":
-                        display_entity_info(selected_obj, ifc_schema_graph)
+                    with info_graph_col:
+                        display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
                     
     

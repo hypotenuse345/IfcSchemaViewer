@@ -1,0 +1,56 @@
+[
+    {
+        "type": "human",
+        "data": {
+            "content": "\n\n```sparql\nSELECT * WHERE { ?s rdf:type owl:AnnotationProperty } LIMIT 10\n```",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null,
+            "example": false
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "{\n    \"s\":{\n        \"0\":\"http:\\/\\/purl.org\\/dc\\/elements\\/1.1\\/creator\",\n        \"1\":\"http:\\/\\/purl.org\\/dc\\/elements\\/1.1\\/date\",\n        \"2\":\"http:\\/\\/www.w3.org\\/2000\\/01\\/rdf-schema#comment\",\n        \"3\":\"http:\\/\\/www.w3.org\\/2000\\/01\\/rdf-schema#label\",\n        \"4\":\"http:\\/\\/www.w3.org\\/2002\\/07\\/owl#versionInfo\"\n    }\n}",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "example": false,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    },
+    {
+        "type": "human",
+        "data": {
+            "content": "\n\n```sparql\nSELECT * WHERE { ?s rdf:type owl:AnnotationProperty } LIMIT 10\n```",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "human",
+            "name": null,
+            "id": null,
+            "example": false
+        }
+    },
+    {
+        "type": "ai",
+        "data": {
+            "content": "{\n    \"s\":{\n        \"0\":\"http:\\/\\/purl.org\\/dc\\/elements\\/1.1\\/creator\",\n        \"1\":\"http:\\/\\/purl.org\\/dc\\/elements\\/1.1\\/date\",\n        \"2\":\"http:\\/\\/www.w3.org\\/2000\\/01\\/rdf-schema#comment\",\n        \"3\":\"http:\\/\\/www.w3.org\\/2000\\/01\\/rdf-schema#label\",\n        \"4\":\"http:\\/\\/www.w3.org\\/2002\\/07\\/owl#versionInfo\"\n    }\n}",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "ai",
+            "name": null,
+            "id": null,
+            "example": false,
+            "tool_calls": [],
+            "invalid_tool_calls": [],
+            "usage_metadata": null
+        }
+    }
+]
