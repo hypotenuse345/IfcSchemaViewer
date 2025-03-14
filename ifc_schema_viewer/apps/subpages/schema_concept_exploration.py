@@ -220,7 +220,7 @@ class SchemaExplorationSubPage(SubPage):
         if keyword:
             entities = {k: v for k, v in entities.items() if keyword.lower() in k.lower()}
         
-        selections = st.multiselect("选择属性集", list(entities.keys()))
+        selections = st.multiselect("选择实体", list(entities.keys()))
         if selections:
             with st.spinner("正在查询中..."):
                 if len(selections) > 1:
@@ -248,7 +248,6 @@ class SchemaExplorationSubPage(SubPage):
         elif search_option == "按实体检索":
             self._display_property_sets_info_by_entity(ifc_schema_graph)
     
-    
     def render(self):
         with st.sidebar:
             sidetab1, sidetab2 = st.tabs(["📝 基本信息", "👨‍💻 开发者信息"])
@@ -264,9 +263,9 @@ class SchemaExplorationSubPage(SubPage):
             maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
                 "📝 按概念组查看",
                 "📚 属性集检索",
-                "🌐 占位",
-                "🏷️ 占位", 
-                "🔗 占位",])
+                "🌐 实体继承关系",
+                "🏷️ 枚举类", 
+                "🔗 导出类型",])
             
             with maintab1.container():
                 self.display_concept_groups_widget()
