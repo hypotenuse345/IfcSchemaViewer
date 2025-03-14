@@ -52,10 +52,12 @@ class TypeInfo(ConceptInfo):
             f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             PREFIX owl: <http://www.w3.org/2002/07/owl#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT DISTINCT ?entity_name ?entity ?attribute_name
+            SELECT DISTINCT ?entity_name ?entity ?attribute_name ?direct_attr_num ?cardinality
             WHERE {{
                 ?attr <{ONT["attrRange"]}> <{self.iri}> ;
-                    <{ONT["name"]}> ?attribute_name.
+                    <{ONT["name"]}> ?attribute_name;
+                    <{ONT["direct_attr_num"]}> ?direct_attr_num;
+                    <{ONT["cardinality"]}> ?cardinality.
                 ?direct_entity <{ONT["hasDirectAttribute"]}> ?attr;
                     <{ONT["superClassOf"]}>* ?entity.
                 ?entity <{ONT["name"]}> ?entity_name.
@@ -66,14 +68,16 @@ class TypeInfo(ConceptInfo):
             self.is_referenced_by_entities.append({
                 "entity": result_row.entity_name,
                 "attribute": result_row.attribute_name,
-                "entity iri": result_row.entity
+                "entity iri": result_row.entity,
+                "direct_attr_num": result_row.direct_attr_num,
+                "cardinality": result_row.cardinality
             })
     def display(self, container):
         with container:
             st.write("#### *Referencing Entities*")
             selected = st.dataframe(
                 self.is_referenced_by_entities, hide_index=True, use_container_width=True,
-                column_order=["entity", "attribute"], selection_mode="single-row",
+                column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
                 on_select="rerun"
             )
         if selected["selection"]["rows"]:
@@ -114,6 +118,7 @@ class EnumInfo(TypeInfo):
     
     def display(self, container):
         with container:
+            st.write("#### *Enum Values*")
             st.dataframe(self.members, hide_index=True, use_container_width=True)
         super().display(container)
             
@@ -174,6 +179,7 @@ class PropertyEnumInfo(ConceptInfo):
             })
     def display(self, container):
         with container:
+            st.write("#### *Enum Values*")
             st.dataframe(self.members, hide_index=True, use_container_width=True)
             
         with container:
@@ -681,9 +687,10 @@ class IfcConceptRenderer:
             st.session_state.cached_concept_info[individual_iri] = concept_info_class(iri=individual_iri, rdf_graph=ifc_schema_graph)
         concept_info = st.session_state.cached_concept_info[individual_iri]
         
-        container = st.expander(label=f"**{concept_info.label}**", expanded=True)
+        container = st.expander(label=f"**{concept_info.label}** - {concept_info.express_type}", expanded=True)
         with container:
             st.header(f"{concept_info.label}", divider=True)
+            st.markdown(f"*{concept_info.express_type}*")
             mdlit(f"@({concept_info.label})(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{concept_info.label}.htm)")
         
         concept_info.display(container)
