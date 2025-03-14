@@ -4,6 +4,7 @@ import streamlit as st
 from streamlit_echarts import st_echarts
 from streamlit_extras.markdownlit import mdlit
 from streamlit_extras.stoggle import stoggle
+from streamlit_extras.grid import grid as st_grid
 
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
@@ -12,6 +13,7 @@ from ifc_schema_viewer.utils import EchartsUtility
 import random
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
+INST = rdflib.Namespace("http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#")
 
 class ConceptInfo(BaseModel):
     iri: Annotated[str, Field(description="The IRI of the concept")]
@@ -580,10 +582,83 @@ class EntityInfo(ConceptInfo):
         self._display_inverse_attributes(container)
         self._display_pset_templates(container)
 
+class PropRange(BaseModel):
+    _ranges: List[str] = PrivateAttr(default_factory=list)
+    @property
+    def ranges(self):
+        return self._ranges
+    
+    _value: Any = PrivateAttr(None)
+    
+    @property
+    def value(self):
+        return self._value
+    
+    name: str = Field(description="Name of the property")
+    concept_info: ConceptInfo = Field(description="ConceptInfo of the property datatype")
+    
+    @property
+    def rdf_graph(self):
+        return self.concept_info.rdf_graph
+    
+    def model_post_init(self, __context):
+        if not self.rdf_graph or not isinstance(self.rdf_graph, rdflib.Graph):
+            raise ValueError("RDF graph is not valid")
+    
+    def to_input(self):
+        raise NotImplementedError("Subclass must implement this method")
+    
+class DerivedPropRange(PropRange):
+    def model_post_init(self, __context):
+        # check if the property range is a Derived Type
+        if not isinstance(self.concept_info, DerivedTypeInfo):
+            raise ValueError("Property range is not a Derived Type")
+    
+    def recursive_to_input(self, prop_name, derived_from):
+        if derived_from == "STRING":
+            return st.text_input(f"{prop_name}_derived_type", label_visibility="collapsed")
+        elif derived_from == "REAL":
+            return st.number_input(f"{prop_name}_derived_type", format="%0.6f", label_visibility="collapsed")
+        elif derived_from == "INTEGER":
+            return st.number_input(f"{prop_name}_derived_type", step=1, label_visibility="collapsed")
+        elif derived_from == "BOOLEAN":
+            return st.checkbox(f"{prop_name}_derived_type", label_visibility="collapsed")
+        elif derived_from.startswith("Ifc"):
+            self.concept_info = DerivedTypeInfo(iri=INST[derived_from], rdf_graph=self.rdf_graph)
+            return self.recursive_to_input(prop_name, self.concept_info.derived_from)
+        else:
+            return st.text_input(f"{prop_name}_derived_type", value=f"Unknown type of {self.concept_info.derived_from}", label_visibility="collapsed")
+    
+    def to_input(self):
+        grid = st_grid([1,3])
+        param_name_container, param_value_container = grid.container(), grid.container()
+        with param_name_container:
+            st.write(f"**{self.name}**")
+        with param_value_container:
+            if self.concept_info.cardinality.toPython() not in [1, "1"]:
+                st.write(f"Cardinality: {self.concept_info.cardinality}")
+            self._value = self.recursive_to_input(self.name, self.concept_info.derived_from)
+                
+class PEnumPropRange(PropRange):
+    def model_post_init(self, __context):
+        # check if the property range is a PEnum
+        if not isinstance(self.concept_info, PropertyEnumInfo):
+            raise ValueError("Property range is not a PEnum")
+    
+    def to_input(self):
+        grid = st_grid([1,3])
+        param_name_container, param_value_container = grid.container(), grid.container()
+        with param_name_container:
+            st.write(f"**{self.name}**")
+        with param_value_container:
+            self._value = st.selectbox(f"{self.name}_enum_values", [mem["enum value"] for mem in self.concept_info.members], label_visibility="collapsed")
+                
+
 class PsetInfo(ConceptInfo):
     _express_type: str = PrivateAttr("express:PropertySetTemplate")
     _props: List[Dict[str, str]] = PrivateAttr(default_factory=list)
     _applicable_entities: List[str] = PrivateAttr(default_factory=list)
+    _prop_ranges: List[PropRange] = PrivateAttr(default_factory=list)
     @property
     def props(self):
         return self._props
@@ -591,6 +666,10 @@ class PsetInfo(ConceptInfo):
     @property
     def applicable_entities(self):
         return self._applicable_entities
+    
+    @property
+    def prop_ranges(self):
+        return self._prop_ranges
     
     def model_post_init(self, __context):
         super().model_post_init(__context)
@@ -611,13 +690,14 @@ class PsetInfo(ConceptInfo):
             f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             PREFIX owl: <http://www.w3.org/2002/07/owl#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT DISTINCT ?prop_name ?description ?data_type ?property_type ?dataType ?express_type
+            SELECT DISTINCT ?prop_name ?description ?data_type ?property_type ?dataType ?express_type ?dataType_express_type
             WHERE {{
                 <{self.iri}> <{ONT["hasPropTemplate"]}> ?prop .
                 ?prop <{ONT["name"]}> ?prop_name;
                     <{ONT["data_type"]}> ?data_type;
                     <{ONT["description"]}> ?description;
                     <{ONT["dataType"]}> ?dataType.
+                ?dataType a ?dataType_express_type.
                 OPTIONAL {{?prop <{ONT["property_type"]}> ?property_type.}}
                 ?dataType a ?express_type.
                 FILTER (STRSTARTS(str(?express_type), "{ONT}"))
@@ -630,8 +710,19 @@ class PsetInfo(ConceptInfo):
                 "data_type": result_row.data_type,
                 "dataType": result_row.dataType,
                 "express type": result_row.express_type.n3(self.rdf_graph.namespace_manager),
-                "description": result_row.description,
+                "description": result_row.description
             })
+            dataType_express_type = result_row.dataType_express_type
+            if dataType_express_type == ONT["DerivedType"]:
+                self.prop_ranges.append(
+                    DerivedPropRange(name=result_row.prop_name,
+                                     concept_info=DerivedTypeInfo(iri=result_row.dataType,rdf_graph=self.rdf_graph)))
+            elif dataType_express_type == ONT["PropertyEnumeration"]:
+                self.prop_ranges.append(
+                    PEnumPropRange(name=result_row.prop_name,
+                                   concept_info=PropertyEnumInfo(iri=result_row.dataType,rdf_graph=self.rdf_graph)))
+            else:
+                st.warning(f"Unknown data type: {dataType_express_type}")
             
         results = self.rdf_graph.query(
             f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -685,8 +776,16 @@ class PsetInfo(ConceptInfo):
             entity = self.applicable_entities[selected_index]
             IfcConceptRenderer.display_selected_individual_info("express:Entity", entity, self.rdf_graph)
     
-    
-
+        with container.container(border=True):
+            st.write(f"#### *Test Instantiation*")
+                # form_container = st.container()
+            for prange in self.prop_ranges:
+                prange.to_input()
+            submit = st.button("生成实例", key=f"{self.seed}_{self.iri}_submit")
+            
+            if submit:
+                st.write([f"{prange.name}:{prange.value}" for prange in self.prop_ranges])
+            
 class QsetInfo(PsetInfo):
     _express_type: str = PrivateAttr("express:QuantitySetTemplate")
     
@@ -713,19 +812,7 @@ class DerivedTypeInfo(TypeInfo):
         super().model_post_init(__context)
 
         results = self.rdf_graph.query(
-            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            PREFIX owl: <http://www.w3.org/2002/07/owl#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT DISTINCT ?definitions
-            WHERE {{
-                <{self.iri}> <{ONT["definitions"]}> ?definitions.
-            }}"""
-        )
-        for result_row in results:
-            self._definitions = result_row.definitions
-
-        results = self.rdf_graph.query(
-            f"""SELECT ?derived_from ?cardinality ?definitions
+            f"""SELECT DISTINCT ?derived_from ?cardinality ?definitions
             WHERE {{
                 <{self.iri}> <{ONT["derivedFrom"]}> ?derived_from;
                     <{ONT["definitions"]}> ?definitions;
@@ -740,6 +827,7 @@ class DerivedTypeInfo(TypeInfo):
                 derived_from = derived_from.fragment
             self._derived_from = derived_from
             self._cardinality = cardinality
+            self._definitions = result_row.definitions
         
     def display(self, container):
         with container:
