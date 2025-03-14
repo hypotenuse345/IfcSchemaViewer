@@ -131,7 +131,8 @@ class SchemaExplorationSubPage(SubPage):
                     selected_concept = selected_obj.fragment
                     mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
                     display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
-                    IfcConceptRenderer.render_selected_instance_echarts(selected_obj, ifc_schema_graph, height=600)
+                    if st.checkbox("显示实例图结构", value=False):
+                        IfcConceptRenderer.render_selected_instance_echarts(selected_obj, ifc_schema_graph, height=600)
                     selected_type = concepts["type"][selected_index]
                     with info_graph_col:
                         IfcConceptRenderer.display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)

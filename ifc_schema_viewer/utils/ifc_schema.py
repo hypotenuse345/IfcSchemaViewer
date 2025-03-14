@@ -3,6 +3,7 @@ from rdflib import RDF, RDFS, OWL
 import streamlit as st
 from streamlit_echarts import st_echarts
 from streamlit_extras.markdownlit import mdlit
+from streamlit_extras.stoggle import stoggle
 
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
@@ -18,6 +19,15 @@ class ConceptInfo(BaseModel):
     @property
     def express_type(self):
         return self._express_type
+    
+    _definitions: Optional[str] = PrivateAttr(default=None)
+    
+    @property
+    def definitions(self):
+        if self._definitions is None:
+            return ""
+        else:
+            return self._definitions.replace("\n", "\n\n")
     
     rdf_graph: Any = Field(description="The RDF graph containing the concept information")
     
@@ -46,6 +56,19 @@ class TypeInfo(ConceptInfo):
     
     def model_post_init(self, __context):
         super().model_post_init(__context)
+        
+        # 定义
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?definitions
+            WHERE {{
+                <{self.iri}> <{ONT["definitions"]}> ?definitions.
+            }}"""
+        )
+        for result_row in results:
+            self._definitions = result_row.definitions
         
         # 被哪些实体引用
         results = self.rdf_graph.query(
@@ -78,7 +101,7 @@ class TypeInfo(ConceptInfo):
             selected = st.dataframe(
                 self.is_referenced_by_entities, hide_index=True, use_container_width=True,
                 column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
-                on_select="rerun"
+                on_select="rerun", key=f"{self.iri}_referencing_entities"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -118,6 +141,7 @@ class EnumInfo(TypeInfo):
     
     def display(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write("#### *Enum Values*")
             st.dataframe(self.members, hide_index=True, use_container_width=True)
         super().display(container)
@@ -137,6 +161,18 @@ class PropertyEnumInfo(ConceptInfo):
 
     def model_post_init(self, __context):
         super().model_post_init(__context)
+
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?definitions
+            WHERE {{
+                <{self.iri}> <{ONT["definitions"]}> ?definitions.
+            }}"""
+        )
+        for result_row in results:
+            self._definitions = result_row.definitions
 
         results = self.rdf_graph.query(
             f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -179,6 +215,7 @@ class PropertyEnumInfo(ConceptInfo):
             })
     def display(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write("#### *Enum Values*")
             st.dataframe(self.members, hide_index=True, use_container_width=True)
             
@@ -189,7 +226,8 @@ class PropertyEnumInfo(ConceptInfo):
                 hide_index=True,
                 use_container_width=True,
                 selection_mode="single-row",
-                on_select="rerun", column_order=["Property Set", "Property"]
+                on_select="rerun", column_order=["Property Set", "Property"],
+                key=f"{self.iri}_referencing_pset_templates"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -229,11 +267,13 @@ class SelectInfo(TypeInfo):
             })
     def display(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write(f"#### *Select Values*")
             selected = st.dataframe(
                 self.members, hide_index=True, 
                 use_container_width=True, selection_mode="single-row",
-                on_select="rerun", column_order=["select value", "express type"])
+                on_select="rerun", column_order=["select value", "express type"],
+                key=f"{self.iri}_select_values")
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             member = self.members[selected_index]
@@ -266,6 +306,18 @@ class EntityInfo(ConceptInfo):
 
     def model_post_init(self, __context):
         super().model_post_init(__context)
+
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?definitions
+            WHERE {{
+                <{self.iri}> <{ONT["definitions"]}> ?definitions.
+            }}"""
+        )
+        for result_row in results:
+            self._definitions = result_row.definitions
 
         # 父实体
         results = self.rdf_graph.query(
@@ -392,13 +444,15 @@ class EntityInfo(ConceptInfo):
     
     def _display_super_entities(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write(f"#### *Super Entities*")
             selected_index = None
             if self.super_entities:
                 selected = st.dataframe(
                     self.super_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"])
+                    on_select="rerun", column_order=["type", "name", "definitions"],
+                    key=f"{self.iri}_super_entities")
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -415,7 +469,8 @@ class EntityInfo(ConceptInfo):
                 selected = st.dataframe(
                     self.sub_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"])
+                    on_select="rerun", column_order=["type", "name", "definitions"],
+                    key=f"{self.iri}_sub_entities")
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -431,7 +486,8 @@ class EntityInfo(ConceptInfo):
                 self.direct_attributes, hide_index=True, 
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun")
+                selection_mode="single-row", on_select="rerun",
+                key=f"{self.iri}_direct_attributes")
         if selected["selection"]["rows"]:
             direct_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.direct_attributes[direct_attr_selected_index]
@@ -444,7 +500,8 @@ class EntityInfo(ConceptInfo):
                 self.inverse_attributes, hide_index=True, 
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun")
+                selection_mode="single-row", on_select="rerun",
+                key=f"{self.iri}_inverse_attributes")
         if selected["selection"]["rows"]:
             inverse_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.inverse_attributes[inverse_attr_selected_index]
@@ -457,7 +514,8 @@ class EntityInfo(ConceptInfo):
                 self.pset_templates, hide_index=True, 
                 use_container_width=True,
                 column_order=["name", "express type", "definitions"],
-                selection_mode="single-row", on_select="rerun")
+                selection_mode="single-row", on_select="rerun",
+                key=f"{self.iri}_pset_templates")
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             selected = self.pset_templates[selected_index]
@@ -484,6 +542,18 @@ class PsetInfo(ConceptInfo):
     
     def model_post_init(self, __context):
         super().model_post_init(__context)
+        
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?definitions
+            WHERE {{
+                <{self.iri}> <{ONT["definitions"]}> ?definitions.
+            }}"""
+        )
+        for result_row in results:
+            self._definitions = result_row.definitions
         
         results = self.rdf_graph.query(
             f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -526,12 +596,14 @@ class PsetInfo(ConceptInfo):
     
     def display(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write(f"#### *Properties*")
             selected = st.dataframe(
                 self.props, hide_index=True, 
                 use_container_width=True,
                 column_order=["property", "property_type", "data_type", "express type", "description"],
-                on_select="rerun", selection_mode="single-row"
+                on_select="rerun", selection_mode="single-row",
+                key=f"{self.iri}_properties"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -543,7 +615,8 @@ class PsetInfo(ConceptInfo):
             selected = st.dataframe(
                 {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True, 
                 use_container_width=True,
-                on_select="rerun", selection_mode="single-row"
+                on_select="rerun", selection_mode="single-row",
+                key=f"{self.iri}_applicable_entities"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -577,6 +650,18 @@ class DerivedTypeInfo(TypeInfo):
         super().model_post_init(__context)
 
         results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?definitions
+            WHERE {{
+                <{self.iri}> <{ONT["definitions"]}> ?definitions.
+            }}"""
+        )
+        for result_row in results:
+            self._definitions = result_row.definitions
+
+        results = self.rdf_graph.query(
             f"""SELECT ?derived_from ?cardinality ?definitions
             WHERE {{
                 <{self.iri}> <{ONT["derivedFrom"]}> ?derived_from;
@@ -595,6 +680,7 @@ class DerivedTypeInfo(TypeInfo):
         
     def display(self, container):
         with container:
+            stoggle("Definitions", self.definitions)
             st.write(f"#### *Definitions*")
             st.markdown(f"*{self.definitions}*")
             st.write(f"#### *Derived from*")
