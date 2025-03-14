@@ -30,6 +30,11 @@ class ConceptInfo(BaseModel):
         else:
             return self._definitions.replace("\n", "\n\n")
     
+    _seed: int = PrivateAttr(default=0)
+    @property
+    def seed(self):
+        return self._seed
+    
     rdf_graph: Any = Field(description="The RDF graph containing the concept information")
     
     def model_post_init(self, __context):
@@ -99,11 +104,18 @@ class TypeInfo(ConceptInfo):
     def display(self, container):
         with container:
             st.write("#### *Referencing Entities*")
-            selected = st.dataframe(
-                self.is_referenced_by_entities, hide_index=True, use_container_width=True,
-                column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
-                on_select="rerun"
-            )
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.is_referenced_by_entities, hide_index=True, use_container_width=True,
+                        column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
+                        on_select="rerun",
+                        key=f"{self.seed}_{self.iri}_referencing_entities"
+                    )
+                    break
+                except Exception as e:
+                    self._seed += 1
+                
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             entity = self.is_referenced_by_entities[selected_index]
@@ -222,13 +234,19 @@ class PropertyEnumInfo(ConceptInfo):
             
         with container:
             st.write("#### *Referencing Property Set Templates*")
-            selected = st.dataframe(
-                self.applicable_pset_templates,
-                hide_index=True,
-                use_container_width=True,
-                selection_mode="single-row",
-                on_select="rerun", column_order=["Property Set", "Property"]
-            )
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.applicable_pset_templates,
+                        hide_index=True,
+                        use_container_width=True,
+                        selection_mode="single-row",
+                        on_select="rerun", column_order=["Property Set", "Property"],
+                        key=f"{self.seed}_{self.iri}_referencing_pset_template"
+                    )
+                    break
+                except:
+                    self._seed += 1
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             pset = self.applicable_pset_templates[selected_index]
@@ -269,10 +287,16 @@ class SelectInfo(TypeInfo):
         with container:
             stoggle("Definitions", self.definitions)
             st.write(f"#### *Select Values*")
-            selected = st.dataframe(
-                self.members, hide_index=True, 
-                use_container_width=True, selection_mode="single-row",
-                on_select="rerun", column_order=["select value", "express type"])
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.members, hide_index=True, 
+                        use_container_width=True, selection_mode="single-row",
+                        on_select="rerun", column_order=["select value", "express type"],
+                        key=f"{self.seed}_{self.iri}_select_members")
+                    break
+                except:
+                    self._seed += 1
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             member = self.members[selected_index]
@@ -447,10 +471,17 @@ class EntityInfo(ConceptInfo):
             st.write(f"#### *Super Entities*")
             selected_index = None
             if self.super_entities:
-                selected = st.dataframe(
-                    self.super_entities, hide_index=True, 
-                    use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"])
+                while True:
+                    try:
+                        selected = st.dataframe(
+                            self.super_entities, hide_index=True, 
+                            use_container_width=True, selection_mode="single-row",
+                            on_select="rerun", column_order=["type", "name", "definitions"],
+                            key=f"{self.seed}_{self.iri}_super_entities")
+                        break
+                    except:
+                        self._seed += 1
+                        
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -464,10 +495,17 @@ class EntityInfo(ConceptInfo):
             st.write(f"#### *Sub Entities*")
             selected_index = None
             if self.sub_entities:
-                selected = st.dataframe(
-                    self.sub_entities, hide_index=True, 
-                    use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"])
+                while True:
+                    try:
+                        selected = st.dataframe(
+                            self.sub_entities, hide_index=True, 
+                            use_container_width=True, selection_mode="single-row",
+                            on_select="rerun", column_order=["type", "name", "definitions"],
+                            key=f"{self.seed}_{self.iri}_sub_entities")
+                        break
+                    except:
+                        self._seed += 1
+                    
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -479,11 +517,18 @@ class EntityInfo(ConceptInfo):
     def _display_direct_attributes(self, container):
         with container:
             st.write(f"#### *Direct Attributes*")
-            selected = st.dataframe(
-                self.direct_attributes, hide_index=True, 
-                use_container_width=True,
-                column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun")
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.direct_attributes, hide_index=True,
+                        use_container_width=True,
+                        column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
+                        selection_mode="single-row", on_select="rerun",
+                        key=f"{self.seed}_{self.iri}_direct_attributes")
+                    break
+                except:
+                    self._seed += 1
+            
         if selected["selection"]["rows"]:
             direct_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.direct_attributes[direct_attr_selected_index]
@@ -492,11 +537,17 @@ class EntityInfo(ConceptInfo):
     def _display_inverse_attributes(self, container):
         with container:
             st.write(f"#### *Inverse Attributes*")
-            selected = st.dataframe(
-                self.inverse_attributes, hide_index=True, 
-                use_container_width=True,
-                column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun")
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.inverse_attributes, hide_index=True,
+                        use_container_width=True,
+                        column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
+                        selection_mode="single-row", on_select="rerun",
+                        key=f"{self.seed}_{self.iri}_inverse_attributes")
+                    break
+                except:
+                    self._seed += 1
         if selected["selection"]["rows"]:
             inverse_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.inverse_attributes[inverse_attr_selected_index]
@@ -505,11 +556,18 @@ class EntityInfo(ConceptInfo):
     def _display_pset_templates(self, container):
         with container:
             st.write(f"#### *Pset Templates*")
-            selected = st.dataframe(
-                self.pset_templates, hide_index=True, 
-                use_container_width=True,
-                column_order=["name", "express type", "definitions"],
-                selection_mode="single-row", on_select="rerun")
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.pset_templates, hide_index=True, 
+                        use_container_width=True,
+                        column_order=["name", "express type", "definitions"],
+                        selection_mode="single-row", on_select="rerun",
+                        key=f"{self.seed}_{self.iri}_pset_templates")
+                    break
+                except:
+                    self._seed += 1
+    
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             selected = self.pset_templates[selected_index]
@@ -592,12 +650,18 @@ class PsetInfo(ConceptInfo):
         with container:
             stoggle("Definitions", self.definitions)
             st.write(f"#### *Properties*")
-            selected = st.dataframe(
-                self.props, hide_index=True, 
-                use_container_width=True,
-                column_order=["property", "property_type", "data_type", "express type", "description"],
-                on_select="rerun", selection_mode="single-row"
-            )
+            while True:
+                try:
+                    selected = st.dataframe(
+                        self.props, hide_index=True, 
+                        use_container_width=True,
+                        column_order=["property", "property_type", "data_type", "express type", "description"],
+                        on_select="rerun", selection_mode="single-row",
+                        key=f"{self.seed}_{self.iri}_props"
+                    )
+                    break
+                except:
+                    self._seed += 1
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             prop = self.props[selected_index]
@@ -605,11 +669,17 @@ class PsetInfo(ConceptInfo):
             
         with container:
             st.write(f"#### *Applicable entities*")
-            selected = st.dataframe(
-                {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True, 
-                use_container_width=True,
-                on_select="rerun", selection_mode="single-row"
-            )
+            while True:
+                try:
+                    selected = st.dataframe(
+                        {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True,
+                        use_container_width=True,
+                        on_select="rerun", selection_mode="single-row",
+                        key=f"{self.seed}_{self.iri}_applicable_entities"
+                    )
+                    break
+                except:
+                    self._seed += 1
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             entity = self.applicable_entities[selected_index]
