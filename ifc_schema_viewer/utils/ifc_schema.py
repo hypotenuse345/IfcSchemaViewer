@@ -9,6 +9,7 @@ from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
 
 from .echarts import EchartsUtility
+import random
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
 
@@ -101,7 +102,7 @@ class TypeInfo(ConceptInfo):
             selected = st.dataframe(
                 self.is_referenced_by_entities, hide_index=True, use_container_width=True,
                 column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
-                on_select="rerun", key=f"{self.iri}_referencing_entities"
+                on_select="rerun", key=f"{self.iri}_referencing_entities_{random.randint(0,100)}"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -227,7 +228,7 @@ class PropertyEnumInfo(ConceptInfo):
                 use_container_width=True,
                 selection_mode="single-row",
                 on_select="rerun", column_order=["Property Set", "Property"],
-                key=f"{self.iri}_referencing_pset_templates"
+                key=f"{self.iri}_referencing_pset_templates_{random.randint(0,100)}"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -273,7 +274,7 @@ class SelectInfo(TypeInfo):
                 self.members, hide_index=True, 
                 use_container_width=True, selection_mode="single-row",
                 on_select="rerun", column_order=["select value", "express type"],
-                key=f"{self.iri}_select_values")
+                key=f"{self.iri}_select_values_{random.randint(0,100)}")
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             member = self.members[selected_index]
@@ -452,7 +453,7 @@ class EntityInfo(ConceptInfo):
                     self.super_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
                     on_select="rerun", column_order=["type", "name", "definitions"],
-                    key=f"{self.iri}_super_entities")
+                    key=f"{self.iri}_super_entities_{random.randint(0,100)}")
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -470,7 +471,7 @@ class EntityInfo(ConceptInfo):
                     self.sub_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
                     on_select="rerun", column_order=["type", "name", "definitions"],
-                    key=f"{self.iri}_sub_entities")
+                    key=f"{self.iri}_sub_entities_{random.randint(0,100)}")
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -487,7 +488,7 @@ class EntityInfo(ConceptInfo):
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
                 selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_direct_attributes")
+                key=f"{self.iri}_direct_attributes_{random.randint(0,100)}")
         if selected["selection"]["rows"]:
             direct_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.direct_attributes[direct_attr_selected_index]
@@ -501,7 +502,7 @@ class EntityInfo(ConceptInfo):
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
                 selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_inverse_attributes")
+                key=f"{self.iri}_inverse_attributes_{random.randint(0,100)}")
         if selected["selection"]["rows"]:
             inverse_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.inverse_attributes[inverse_attr_selected_index]
@@ -515,7 +516,7 @@ class EntityInfo(ConceptInfo):
                 use_container_width=True,
                 column_order=["name", "express type", "definitions"],
                 selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_pset_templates")
+                key=f"{self.iri}_pset_templates_{random.randint(0,100)}")
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             selected = self.pset_templates[selected_index]
@@ -603,7 +604,7 @@ class PsetInfo(ConceptInfo):
                 use_container_width=True,
                 column_order=["property", "property_type", "data_type", "express type", "description"],
                 on_select="rerun", selection_mode="single-row",
-                key=f"{self.iri}_properties"
+                key=f"{self.iri}_properties_{random.randint(0,100)}"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -616,7 +617,7 @@ class PsetInfo(ConceptInfo):
                 {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True, 
                 use_container_width=True,
                 on_select="rerun", selection_mode="single-row",
-                key=f"{self.iri}_applicable_entities"
+                key=f"{self.iri}_applicable_entities_{random.randint(0,100)}"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -780,7 +781,8 @@ class IfcConceptRenderer:
             mdlit(f"@({concept_info.label})(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{concept_info.label}.htm)")
         
         concept_info.display(container)
-        
+    
+    @staticmethod
     def render_selected_instance_echarts(instance_iri, ontology_graph: rdflib.Graph, height=400):
         instance_iri = rdflib.URIRef(instance_iri)
         echarts_graph_info = {"nodes":[], "links":[]}

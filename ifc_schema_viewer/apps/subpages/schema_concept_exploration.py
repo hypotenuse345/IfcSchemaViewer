@@ -138,8 +138,115 @@ class SchemaExplorationSubPage(SubPage):
                         IfcConceptRenderer.display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)
                     # st.write(f"**{selected_obj}** is selected")
     
+    def _get_psets(self, ifc_schema_graph: rdflib.Graph):
+        results = ifc_schema_graph.query(
+            f"""
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            SELECT DISTINCT ?pset ?pset_name ?express_type
+            WHERE {{
+               ?pset rdf:type ?express_type ;
+                    <{ONT["name"]}> ?pset_name.
+               FILTER (?express_type = <{ONT["PropertySetTemplate"]}> || ?express_type = <{ONT["QuantitySetTemplate"]})> )
+            }}
+            """
+        )
+        psets = {}
+        for result in results:
+            psets[result.pset_name]= {
+                "pset": result.pset,
+                "express_type": result.express_type.n3(ifc_schema_graph.namespace_manager)
+            }
+        return psets
+    
+    def _display_property_sets_info_by_pset(self, ifc_schema_graph: rdflib.Graph):
+        if st.session_state.get("psets", None) is None:
+            psets = self._get_psets(ifc_schema_graph)
+            st.session_state["psets"] = psets
+        else:
+            psets = st.session_state["psets"]
+        
+        keyword = st.text_input("输入查询关键词")
+        if keyword:
+            psets = {k: v for k, v in psets.items() if keyword.lower() in k.lower()}
+        
+        selections = st.multiselect("选择属性集", list(psets.keys()))
+        if selections:
+            if len(selections) > 1:
+                grid = st_grid(*[[1,]*2,]*(len(selections) // 2 + len(selections) % 2))
+                containers = [grid.container() for i in range(len(selections))]
+            else:
+                containers = [st.container(),]
+            for name, container in zip(selections, containers):
+                pset = psets[name]
+                with container:
+                    IfcConceptRenderer.display_selected_individual_info(
+                        express_type=pset["express_type"],
+                        individual_iri=pset["pset"],
+                        ifc_schema_graph=ifc_schema_graph
+                    )
+                
+    def _get_entities(self, ifc_schema_graph: rdflib.Graph):
+        results = ifc_schema_graph.query(
+            f"""
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            SELECT DISTINCT ?entity ?entity_name ?express_type
+            WHERE {{
+               ?entity rdf:type ?express_type ;
+                    <{ONT["name"]}> ?entity_name.
+               FILTER (?express_type = <{ONT["Entity"]}>)
+            }}
+            """
+        )
+        entities = {}
+        for result in results:
+            entities[result.entity_name]= {
+                "entity": result.entity,
+                "express_type": result.express_type.n3(ifc_schema_graph.namespace_manager)
+            }
+        return entities
+    
+    def _display_property_sets_info_by_entity(self, ifc_schema_graph: rdflib.Graph):
+        if st.session_state.get("entities", None) is None:
+            entities = self._get_entities(ifc_schema_graph)
+            st.session_state["entities"] = entities
+        else:
+            entities = st.session_state["entities"]
+        
+        keyword = st.text_input("输入查询关键词")
+        if keyword:
+            entities = {k: v for k, v in entities.items() if keyword.lower() in k.lower()}
+        
+        selections = st.multiselect("选择属性集", list(entities.keys()))
+        if selections:
+            with st.spinner("正在查询中..."):
+                if len(selections) > 1:
+                    grid = st_grid(*[[1,]*2,]*(len(selections) // 2 + len(selections) % 2))
+                    containers = [grid.container() for i in range(len(selections))]
+                else:
+                    containers = [st.container(),]
+                for name, container in zip(selections, containers):
+                    entity = entities[name]
+                    with container:
+                        IfcConceptRenderer.display_selected_individual_info(
+                            express_type=entity["express_type"],
+                            individual_iri=entity["entity"],
+                            ifc_schema_graph=ifc_schema_graph
+                        )
+    
+    @st.fragment
     def display_property_sets_info_widget(self):
-        pass
+        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        
+        search_option = st.radio("选择检索方式", ["按属性集检索", "按实体检索"], horizontal=True, label_visibility="collapsed")
+        
+        if search_option == "按属性集检索":
+            self._display_property_sets_info_by_pset(ifc_schema_graph)
+        elif search_option == "按实体检索":
+            self._display_property_sets_info_by_entity(ifc_schema_graph)
     
     
     def render(self):
@@ -156,10 +263,13 @@ class SchemaExplorationSubPage(SubPage):
         with main_col:
             maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
                 "📝 按概念组查看",
-                "📚 按属性集查看",
+                "📚 属性集检索",
                 "🌐 占位",
                 "🏷️ 占位", 
                 "🔗 占位",])
             
             with maintab1.container():
                 self.display_concept_groups_widget()
+            
+            with maintab2.container():
+                self.display_property_sets_info_widget()
