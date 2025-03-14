@@ -102,7 +102,7 @@ class TypeInfo(ConceptInfo):
             selected = st.dataframe(
                 self.is_referenced_by_entities, hide_index=True, use_container_width=True,
                 column_order=["entity", "direct_attr_num", "attribute", "cardinality"], selection_mode="single-row",
-                on_select="rerun", key=f"{self.iri}_referencing_entities_{random.randint(0,100)}"
+                on_select="rerun"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -227,8 +227,7 @@ class PropertyEnumInfo(ConceptInfo):
                 hide_index=True,
                 use_container_width=True,
                 selection_mode="single-row",
-                on_select="rerun", column_order=["Property Set", "Property"],
-                key=f"{self.iri}_referencing_pset_templates_{random.randint(0,100)}"
+                on_select="rerun", column_order=["Property Set", "Property"]
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -273,8 +272,7 @@ class SelectInfo(TypeInfo):
             selected = st.dataframe(
                 self.members, hide_index=True, 
                 use_container_width=True, selection_mode="single-row",
-                on_select="rerun", column_order=["select value", "express type"],
-                key=f"{self.iri}_select_values_{random.randint(0,100)}")
+                on_select="rerun", column_order=["select value", "express type"])
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             member = self.members[selected_index]
@@ -452,8 +450,7 @@ class EntityInfo(ConceptInfo):
                 selected = st.dataframe(
                     self.super_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"],
-                    key=f"{self.iri}_super_entities_{random.randint(0,100)}")
+                    on_select="rerun", column_order=["type", "name", "definitions"])
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -470,8 +467,7 @@ class EntityInfo(ConceptInfo):
                 selected = st.dataframe(
                     self.sub_entities, hide_index=True, 
                     use_container_width=True, selection_mode="single-row",
-                    on_select="rerun", column_order=["type", "name", "definitions"],
-                    key=f"{self.iri}_sub_entities_{random.randint(0,100)}")
+                    on_select="rerun", column_order=["type", "name", "definitions"])
                 if selected["selection"]["rows"]:
                     selected_index = selected["selection"]["rows"][0]
             else:
@@ -487,8 +483,7 @@ class EntityInfo(ConceptInfo):
                 self.direct_attributes, hide_index=True, 
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_direct_attributes_{random.randint(0,100)}")
+                selection_mode="single-row", on_select="rerun")
         if selected["selection"]["rows"]:
             direct_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.direct_attributes[direct_attr_selected_index]
@@ -501,8 +496,7 @@ class EntityInfo(ConceptInfo):
                 self.inverse_attributes, hide_index=True, 
                 use_container_width=True,
                 column_order=["#", "name", "optional", "cardinality", "range", "express type", "description"],
-                selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_inverse_attributes_{random.randint(0,100)}")
+                selection_mode="single-row", on_select="rerun")
         if selected["selection"]["rows"]:
             inverse_attr_selected_index = selected["selection"]["rows"][0]
             selected = self.inverse_attributes[inverse_attr_selected_index]
@@ -515,8 +509,7 @@ class EntityInfo(ConceptInfo):
                 self.pset_templates, hide_index=True, 
                 use_container_width=True,
                 column_order=["name", "express type", "definitions"],
-                selection_mode="single-row", on_select="rerun",
-                key=f"{self.iri}_pset_templates_{random.randint(0,100)}")
+                selection_mode="single-row", on_select="rerun")
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
             selected = self.pset_templates[selected_index]
@@ -603,8 +596,7 @@ class PsetInfo(ConceptInfo):
                 self.props, hide_index=True, 
                 use_container_width=True,
                 column_order=["property", "property_type", "data_type", "express type", "description"],
-                on_select="rerun", selection_mode="single-row",
-                key=f"{self.iri}_properties_{random.randint(0,100)}"
+                on_select="rerun", selection_mode="single-row"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]
@@ -616,8 +608,7 @@ class PsetInfo(ConceptInfo):
             selected = st.dataframe(
                 {"name":[ae.fragment for ae in self.applicable_entities]}, hide_index=True, 
                 use_container_width=True,
-                on_select="rerun", selection_mode="single-row",
-                key=f"{self.iri}_applicable_entities_{random.randint(0,100)}"
+                on_select="rerun", selection_mode="single-row"
             )
         if selected["selection"]["rows"]:
             selected_index = selected["selection"]["rows"][0]

@@ -148,7 +148,7 @@ class SchemaExplorationSubPage(SubPage):
             WHERE {{
                ?pset rdf:type ?express_type ;
                     <{ONT["name"]}> ?pset_name.
-               FILTER (?express_type = <{ONT["PropertySetTemplate"]}> || ?express_type = <{ONT["QuantitySetTemplate"]})> )
+               FILTER (?express_type = <{ONT["PropertySetTemplate"]}> || ?express_type = <{ONT["QuantitySetTemplate"]}> )
             }}
             """
         )
@@ -209,6 +209,34 @@ class SchemaExplorationSubPage(SubPage):
             }
         return entities
     
+    def _get_psets_by_entity(self, ifc_schema_graph: rdflib.Graph, entity: str):
+        query_str = f"""
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            SELECT DISTINCT ?pset ?pset_name ?express_type
+            WHERE {{
+               ?pset rdf:type ?express_type ;
+                    <{ONT["name"]}> ?pset_name;
+                    <{ONT["applicableTo"]}> ?ae.
+               ?ae <{ONT["subClassOf"]}>* <{entity}>.
+               
+                FILTER (?express_type = <{ONT["PropertySetTemplate"]}> || ?express_type = <{ONT["QuantitySetTemplate"]}> )
+            }}
+            """
+        # st.code(query_str)
+        results = ifc_schema_graph.query(
+            query_str
+        )
+        psets = {}
+        for result in results:
+            psets[result.pset_name] = {
+                "pset": result.pset,
+                "name": result.pset_name,
+                "express_type": result.express_type.n3(ifc_schema_graph.namespace_manager)
+            }
+        return psets
+    
     def _display_property_sets_info_by_entity(self, ifc_schema_graph: rdflib.Graph):
         if st.session_state.get("entities", None) is None:
             entities = self._get_entities(ifc_schema_graph)
@@ -217,6 +245,55 @@ class SchemaExplorationSubPage(SubPage):
             entities = st.session_state["entities"]
         
         keyword = st.text_input("输入查询关键词")
+        if keyword:
+            entities = {k: v for k, v in entities.items() if keyword.lower() in k.lower()}
+            
+        selections = st.multiselect("选择实体", list(entities.keys()))
+        psets = {}
+        for name in selections:
+            entity = entities[name]
+            for pset_name, pset in self._get_psets_by_entity(ifc_schema_graph, entity["entity"]).items():
+                psets[pset_name] = pset
+        
+        selections = st.multiselect("选择属性集", list(psets.keys()), key="按实体选择属性集")
+        
+        if selections:
+            with st.spinner("正在查询中..."):
+                if len(selections) > 1:
+                    grid = st_grid(*[[1,]*2,]*(len(selections) // 2 + len(selections) % 2))
+                    containers = [grid.container() for i in range(len(selections))]
+                else:
+                    containers = [st.container(),]
+                for name, container in zip(selections, containers):
+                    pset = psets[name]
+                    with container:
+                        IfcConceptRenderer.display_selected_individual_info(
+                            express_type=pset["express_type"],
+                            individual_iri=pset["pset"],
+                            ifc_schema_graph=ifc_schema_graph
+                        )
+    
+    @st.fragment
+    def display_property_sets_info_widget(self):
+        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        
+        search_option = st.radio("选择检索方式", ["按属性集检索", "按实体检索"], horizontal=True, label_visibility="collapsed")
+        
+        if search_option == "按属性集检索":
+            self._display_property_sets_info_by_pset(ifc_schema_graph)
+        elif search_option == "按实体检索":
+            self._display_property_sets_info_by_entity(ifc_schema_graph)
+    
+    def display_entities_info_widget(self):
+        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        
+        if st.session_state.get("entities", None) is None:
+            entities = self._get_entities(ifc_schema_graph)
+            st.session_state["entities"] = entities
+        else:
+            entities = st.session_state["entities"]
+            
+        keyword = st.text_input("输入查询关键词", key="输入查询关键词，display_entities_info_widget")
         if keyword:
             entities = {k: v for k, v in entities.items() if keyword.lower() in k.lower()}
         
@@ -237,16 +314,11 @@ class SchemaExplorationSubPage(SubPage):
                             ifc_schema_graph=ifc_schema_graph
                         )
     
-    @st.fragment
-    def display_property_sets_info_widget(self):
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
-        
-        search_option = st.radio("选择检索方式", ["按属性集检索", "按实体检索"], horizontal=True, label_visibility="collapsed")
-        
-        if search_option == "按属性集检索":
-            self._display_property_sets_info_by_pset(ifc_schema_graph)
-        elif search_option == "按实体检索":
-            self._display_property_sets_info_by_entity(ifc_schema_graph)
+    def display_enumeration_classes_widget(self):
+        pass
+
+    def display_derived_types_widget(self):
+        pass
     
     def render(self):
         with st.sidebar:
@@ -272,3 +344,12 @@ class SchemaExplorationSubPage(SubPage):
             
             with maintab2.container():
                 self.display_property_sets_info_widget()
+                
+            with maintab3.container():
+                self.display_entities_info_widget()
+
+            with maintab4.container():
+                self.display_enumeration_classes_widget()
+
+            with maintab5.container():
+                self.display_derived_types_widget()
