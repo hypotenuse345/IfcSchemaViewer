@@ -154,12 +154,27 @@ class EnumInfo(TypeInfo):
                 "description": result_row.member_description
             })
     
+    def recursive_to_input(self):
+        while True:
+            try:
+                value = st.selectbox(f"{self.seed}_{self.iri}_input", 
+                                     [mem["enum value"] for mem in self.members], 
+                                     label_visibility="collapsed")
+                break
+            except:
+                self._seed += 1
+        return value
+    
     def display(self, container):
         with container:
             stoggle("Definitions", self.definitions)
             st.write("#### *Enum Values*")
             st.dataframe(self.members, hide_index=True, use_container_width=True)
         super().display(container)
+        with container:
+            st.write("#### *Test Instantiation*")
+            value = self.recursive_to_input()
+            st.write(value)
             
 class PropertyEnumInfo(ConceptInfo):
     _members: List[Dict[str, str]] = PrivateAttr(default_factory=list)
@@ -228,6 +243,15 @@ class PropertyEnumInfo(ConceptInfo):
                 "property iri": result_row.prop,
                 "Property": result_row.prop_name
             })
+    def recursive_to_input(self):
+        while True:
+            try:
+                value = st.selectbox(f"{self.seed}_{self.iri}_input", [mem["enum value"] for mem in self.members], label_visibility="collapsed")
+                break
+            except:
+                self._seed += 1
+        return value
+            
     def display(self, container):
         with container:
             stoggle("Definitions", self.definitions)
@@ -253,6 +277,11 @@ class PropertyEnumInfo(ConceptInfo):
             selected_index = selected["selection"]["rows"][0]
             pset = self.applicable_pset_templates[selected_index]
             IfcConceptRenderer.display_selected_individual_info("express:PropertySetTemplate", pset["pset template iri"], self.rdf_graph)
+            
+        with container:
+            st.write("#### *Test Instantiation*")
+            value = self.recursive_to_input()
+            st.write(value)
 
 
 class SelectInfo(TypeInfo):
