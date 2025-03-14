@@ -36,7 +36,53 @@ class ConceptInfo(BaseModel):
     def display(self, container):
         raise NotImplementedError("Subclasses must implement the display method")
 
-class EnumInfo(ConceptInfo):
+class TypeInfo(ConceptInfo):
+    _express_type: str = PrivateAttr("express:Type")
+    
+    _is_referenced_by_entities: List[str] = PrivateAttr(default_factory=list)
+    @property
+    def is_referenced_by_entities(self):
+        return self._is_referenced_by_entities
+    
+    def model_post_init(self, __context):
+        super().model_post_init(__context)
+        
+        # 被哪些实体引用
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?entity_name ?entity ?attribute_name
+            WHERE {{
+                ?attr <{ONT["attrRange"]}> <{self.iri}> ;
+                    <{ONT["name"]}> ?attribute_name.
+                ?direct_entity <{ONT["hasDirectAttribute"]}> ?attr;
+                    <{ONT["superClassOf"]}>* ?entity.
+                ?entity <{ONT["name"]}> ?entity_name.
+                
+            }}"""
+        )
+        for result_row in results:
+            self.is_referenced_by_entities.append({
+                "entity": result_row.entity_name,
+                "attribute": result_row.attribute_name,
+                "entity iri": result_row.entity
+            })
+    def display(self, container):
+        with container:
+            st.write("#### *Referencing Entities*")
+            selected = st.dataframe(
+                self.is_referenced_by_entities, hide_index=True, use_container_width=True,
+                column_order=["entity", "attribute"], selection_mode="single-row",
+                on_select="rerun"
+            )
+        if selected["selection"]["rows"]:
+            selected_index = selected["selection"]["rows"][0]
+            entity = self.is_referenced_by_entities[selected_index]
+            IfcConceptRenderer.display_selected_individual_info("express:Entity", entity["entity iri"], self.rdf_graph)
+
+
+class EnumInfo(TypeInfo):
     _members: List[Dict[str, str]] = PrivateAttr(default_factory=list)
     @property
     def members(self):
@@ -69,11 +115,83 @@ class EnumInfo(ConceptInfo):
     def display(self, container):
         with container:
             st.dataframe(self.members, hide_index=True, use_container_width=True)
+        super().display(container)
             
-class PropertyEnumInfo(EnumInfo):
+class PropertyEnumInfo(ConceptInfo):
+    _members: List[Dict[str, str]] = PrivateAttr(default_factory=list)
+    @property
+    def members(self):
+        return self._members
+    
     _express_type: str = PrivateAttr("express:PropertyEnumeration")
+    
+    _applicable_pset_templates: List[Dict[str, str]] = PrivateAttr(default_factory=list)
+    @property
+    def applicable_pset_templates(self):
+        return self._applicable_pset_templates
 
-class SelectInfo(ConceptInfo):
+    def model_post_init(self, __context):
+        super().model_post_init(__context)
+
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?member_name ?member_description
+            WHERE {{
+                <{self.iri}> <{ONT["hasValue"]}> ?member .
+                ?member a <{ONT["EnumValue"]}>;
+                    <{ONT["name"]}> ?member_name;
+                    <{ONT["description"]}> ?member_description.
+            }}
+            """
+        )
+        for result_row in results:
+            self.members.append({
+                "enum value": result_row.member_name,
+                "description": result_row.member_description
+            })
+
+        results = self.rdf_graph.query(
+            f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            SELECT DISTINCT ?pset_template ?pset_template_name ?prop ?prop_name
+            WHERE {{
+                ?prop <{ONT["dataType"]}> <{self.iri}>;
+                    <{ONT['name']}> ?prop_name.
+                ?pset_template <{ONT["hasPropTemplate"]}> ?prop ;
+                    <{ONT["name"]}> ?pset_template_name.
+            }}
+            """
+        )
+        for result_row in results:
+            self.applicable_pset_templates.append({
+                "pset template iri": result_row.pset_template,
+                "Property Set": result_row.pset_template_name,
+                "property iri": result_row.prop,
+                "Property": result_row.prop_name
+            })
+    def display(self, container):
+        with container:
+            st.dataframe(self.members, hide_index=True, use_container_width=True)
+            
+        with container:
+            st.write("#### *Referencing Property Set Templates*")
+            selected = st.dataframe(
+                self.applicable_pset_templates,
+                hide_index=True,
+                use_container_width=True,
+                selection_mode="single-row",
+                on_select="rerun", column_order=["Property Set", "Property"]
+            )
+        if selected["selection"]["rows"]:
+            selected_index = selected["selection"]["rows"][0]
+            pset = self.applicable_pset_templates[selected_index]
+            IfcConceptRenderer.display_selected_individual_info("express:PropertySetTemplate", pset["pset template iri"], self.rdf_graph)
+
+
+class SelectInfo(TypeInfo):
     _members: List[Dict[str, str]] = PrivateAttr(default_factory=list)
     @property
     def members(self):
@@ -114,6 +232,7 @@ class SelectInfo(ConceptInfo):
             selected_index = selected["selection"]["rows"][0]
             member = self.members[selected_index]
             IfcConceptRenderer.display_selected_individual_info(member["express type"], member["iri"], self.rdf_graph)
+        super().display(container)
 
 class EntityInfo(ConceptInfo):
     _express_type: str = PrivateAttr("express:Entity")
@@ -429,11 +548,12 @@ class PsetInfo(ConceptInfo):
 class QsetInfo(PsetInfo):
     _express_type: str = PrivateAttr("express:QuantitySetTemplate")
     
-class DerivedTypeInfo(ConceptInfo):
+class DerivedTypeInfo(TypeInfo):
     _express_type: str = PrivateAttr("express:DerivedType")
     
     _derived_from: str = PrivateAttr(None)
     _cardinality: str = PrivateAttr(None)
+    _definitions: str = PrivateAttr(None)
     
     @property
     def derived_from(self):
@@ -442,14 +562,19 @@ class DerivedTypeInfo(ConceptInfo):
     @property
     def cardinality(self):
         return self._cardinality
+    
+    @property
+    def definitions(self):
+        return self._definitions
 
     def model_post_init(self, __context):
         super().model_post_init(__context)
 
         results = self.rdf_graph.query(
-            f"""SELECT ?derived_from ?cardinality
+            f"""SELECT ?derived_from ?cardinality ?definitions
             WHERE {{
                 <{self.iri}> <{ONT["derivedFrom"]}> ?derived_from;
+                    <{ONT["definitions"]}> ?definitions;
                     <{ONT["cardinality"]}> ?cardinality.
             }}
             """
@@ -464,10 +589,14 @@ class DerivedTypeInfo(ConceptInfo):
         
     def display(self, container):
         with container:
+            st.write(f"#### *Definitions*")
+            st.markdown(f"*{self.definitions}*")
+            st.write(f"#### *Derived from*")
             if str(self.cardinality) != "1":
                 st.write(f"{self.cardinality} *{self.derived_from}*")
             else:
                 st.write(f"*{self.derived_from}*")
+        super().display(container)
             
 
 concept_info_map: Dict[str, Type[ConceptInfo]] = {
