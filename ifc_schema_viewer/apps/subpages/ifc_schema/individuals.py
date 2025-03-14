@@ -8,7 +8,7 @@ from streamlit_extras.stoggle import stoggle
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
 
-from .echarts import EchartsUtility
+from ifc_schema_viewer.utils import EchartsUtility
 import random
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
@@ -684,7 +684,8 @@ class PsetInfo(ConceptInfo):
             selected_index = selected["selection"]["rows"][0]
             entity = self.applicable_entities[selected_index]
             IfcConceptRenderer.display_selected_individual_info("express:Entity", entity, self.rdf_graph)
-            
+    
+    
 
 class QsetInfo(PsetInfo):
     _express_type: str = PrivateAttr("express:QuantitySetTemplate")
