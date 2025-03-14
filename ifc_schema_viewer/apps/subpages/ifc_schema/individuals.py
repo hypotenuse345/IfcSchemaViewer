@@ -775,16 +775,16 @@ class PsetInfo(ConceptInfo):
             selected_index = selected["selection"]["rows"][0]
             entity = self.applicable_entities[selected_index]
             IfcConceptRenderer.display_selected_individual_info("express:Entity", entity, self.rdf_graph)
-    
-        with container.container(border=True):
+        
+        with container:
             st.write(f"#### *Test Instantiation*")
-                # form_container = st.container()
-            for prange in self.prop_ranges:
-                prange.to_input()
-            submit = st.button("生成实例", key=f"{self.seed}_{self.iri}_submit")
-            
-            if submit:
-                st.write([f"{prange.name}:{prange.value}" for prange in self.prop_ranges])
+            with container.container(border=True):
+                for prange in self.prop_ranges:
+                    prange.to_input()
+                submit = st.button("生成实例", key=f"{self.seed}_{self.iri}_submit")
+                
+                if submit:
+                    st.write([f"{prange.name}:{prange.value}" for prange in self.prop_ranges])
             
 class QsetInfo(PsetInfo):
     _express_type: str = PrivateAttr("express:QuantitySetTemplate")
@@ -828,7 +828,27 @@ class DerivedTypeInfo(TypeInfo):
             self._derived_from = derived_from
             self._cardinality = cardinality
             self._definitions = result_row.definitions
-        
+    
+    def recursive_to_input(self, derived_from):
+        while True:
+            try:
+                if derived_from == "STRING":
+                    result = st.text_input(f"{self.seed}_{self.iri}_input", label_visibility="collapsed")
+                elif derived_from == "REAL":
+                    result =  st.number_input(f"{self.seed}_{self.iri}_input", format="%0.6f", label_visibility="collapsed")
+                elif derived_from == "INTEGER":
+                    result =  st.number_input(f"{self.seed}_{self.iri}_input", step=1, label_visibility="collapsed")
+                elif derived_from == "BOOLEAN":
+                    result =  st.checkbox(f"{self.seed}_{self.iri}_input", label_visibility="collapsed")
+                elif derived_from.startswith("Ifc"):
+                    result =  self.recursive_to_input(DerivedTypeInfo(iri=INST[self.derived_from], rdf_graph=self.rdf_graph))
+                else:
+                    result =  st.text_input(f"{self.seed}_{self.iri}_input", value=f"Unknown type of {self.concept_info.derived_from}", label_visibility="collapsed")
+                break
+            except:
+                self._seed += 1
+        return result
+    
     def display(self, container):
         with container:
             stoggle("Definitions", self.definitions)
@@ -840,7 +860,11 @@ class DerivedTypeInfo(TypeInfo):
             else:
                 st.write(f"*{self.derived_from}*")
         super().display(container)
-            
+        with container:
+            st.write(f"#### *Test Instantiation*")
+            value = self.recursive_to_input(self.derived_from)
+            st.write(value)
+        
 
 concept_info_map: Dict[str, Type[ConceptInfo]] = {
     "express:Enum": EnumInfo,
