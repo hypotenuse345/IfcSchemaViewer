@@ -352,7 +352,7 @@ PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
                 "📚 属性集检索",
                 "🌐 实体继承关系",
                 "🏷️ 枚举类", 
-                "🔗 导出类型",
+                "🔗 派生类型",
                 "📡 SPARQL 查询",])
             
             with maintab1.container():

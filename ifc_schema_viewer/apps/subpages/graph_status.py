@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_echarts import st_echarts
 from streamlit_extras.grid import grid as st_grid
+from streamlit_timeline import timeline
 
 import rdflib
 from rdflib import RDF, RDFS, OWL, SKOS, Dataset
@@ -472,6 +473,12 @@ class GraphStatusSubPage(SubPage):
                 render_selected_prop_echarts(self.ifc_schema_dataset, selected_iri)
             self.display_metadata(selected_iri, info_col)
     
+    def render_ifc_timeline(self):
+        with open('./resources/ifc/history_of_ifc_versions.json', "r") as f:
+            data = f.read()
+        
+        # render timeline
+        timeline(data, height=500)
     
     def render(self):
         # 占位：边栏
@@ -486,12 +493,16 @@ class GraphStatusSubPage(SubPage):
          # 占位： 主页面
         main_col = st.container()
         with main_col:
-            maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
+            devtab, maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
+                "📅 IFC版本发展时间轴",
                 "📝 子图统计",
                 "📚 命名空间",
                 "🌐 本体可视化",
                 "🏷️ 类", 
                 "🔗 属性",])
+        
+        with devtab.container():
+            self.render_ifc_timeline()
         
         with maintab1.container():
             self.display_subgraph_statistics()

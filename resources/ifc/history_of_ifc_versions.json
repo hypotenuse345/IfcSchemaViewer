@@ -1,0 +1,224 @@
+{
+    "title": {
+        "media": {
+            "url": "",
+            "caption": " <a target=\"_blank\" href='https://technical.buildingsmart.org/standards/ifc/ifc-schema-specifications/'>credits</a>",
+            "credit": ""
+        },
+        "text": {
+            "headline": "History of IFC",
+            "text": "<p>IFC is a standardized data format for the construction and facility management industry. The following table shows the history of IFC versions and their release dates.</p>"
+        }
+    },
+    "events": [
+        {
+            "media": {
+              "url": "",
+              "caption": "IFC 2.0 (2.0.0.0, Retired) "
+            },
+            "start_date": {
+              "year": "1999",
+              "month":"10"
+            },
+            "text": {
+              "headline": "IFC 2.0",
+              "text": "Version: 2.0.0.0, Published: 1999-10, Current Status: Retired"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2000",
+              "month":"10"
+            },
+            "text": {
+              "headline": "IFC 2x",
+              "text": "Version: 2.1.0.0, Published: 2000-10, Current Status: Retired.  <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2001",
+              "month":"10"
+            },
+            "text": {
+              "headline": "IFC 2x ADD1",
+              "text": "Version: 2.1.1.0, Published: 2001-10, Current Status: Retired.  <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x/ADD1/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2003",
+              "month":"05"
+            },
+            "text": {
+              "headline": "IFC 2x2",
+              "text": "Version: 2.2.0.0, Published: 2003-05, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x2/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2004",
+              "month":"07"
+            },
+            "text": {
+              "headline": "IFC 2x2 ADD1",
+              "text": "Version: 2.2.1.0, Published: 2004-07, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x2/ADD1/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2005",
+              "month":"12"
+            },
+            "text": {
+              "headline": "IFC 2x3",
+              "text": "Version: 2.3.0.0, Published: 2005-12, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x3/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2007",
+              "month":"07"
+            },
+            "text": {
+              "headline": "IFC 2x3 TC1 (ISO/PAS 16739:2005)",
+              "text": "Version: 2.3.0.1, Published: 2007-07, Current Status: Official. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC2x3/TC1/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2013",
+              "month":"02"
+            },
+            "text": {
+              "headline": "IFC 4 (ISO 16739:2013)",
+              "text": "Version: 4.0.0.0, Published: 2013-02, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2015",
+              "month":"06"
+            },
+            "text": {
+              "headline": "IFC 4 ADD1",
+              "text": "Version: 4.0.1.0, Published: 2015-06, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD1/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2016",
+              "month":"07"
+            },
+            "text": {
+              "headline": "IFC 4 ADD2",
+              "text": "Version: 4.0.2.0, Published: 2016-07, Current Status: Retired. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2017",
+              "month":"10"
+            },
+            "text": {
+              "headline": "IFC 4 ADD2 TC1 (ISO 16739-1:2018)",
+              "text": "Version: 4.0.2.1, Published: 2017-10, Current Status: Official. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2018",
+              "month":"06"
+            },
+            "text": {
+              "headline": "IFC 4.1",
+              "text": "Version: 4.1.0.0, Published: 2018-06, Current Status: Withdrawn. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4_1/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2019",
+              "month":"04"
+            },
+            "text": {
+              "headline": "IFC 4.2",
+              "text": "Version: 4.2.0.0, Published: 2019-04, Current Status: Withdrawn. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4_2/FINAL/HTML/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2024",
+              "month":"04"
+            },
+            "text": {
+              "headline": "IFC 4.3 ADD2 (ISO 16739-1:2024)",
+              "text": "Version: 4.3.2.0, Published: 2024-04, Current Status: Official. <a target=\"_blank\" href='https://standards.buildingsmart.org/IFC/RELEASE/IFC4_3/'>website</a>"
+            }
+        },
+        {
+            "media": {
+              "url": "",
+              "caption": ""
+            },
+            "start_date": {
+              "year": "2025"
+            },
+            "text": {
+              "headline": "IFC 5 dev",
+              "text": "Version: 5.0 dev, Developing: 2025-03, Current Status: Next generation IFC. Refactoring of the IFC 4.x content. Currently under development. <a target=\"_blank\" href='https://ifc5.technical.buildingsmart.org/'>website</a>"
+            }
+        }
+    ]
+}
