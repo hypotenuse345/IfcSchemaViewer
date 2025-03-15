@@ -82,7 +82,7 @@ class RDFQuerySubPage(SubPage):
                 # 将查询结果转换为DataFrame，列名为结果变量的名称
                 df = pd.DataFrame(results, columns=[str(kk) for kk in results.vars])
                 # 显示查询结果
-                st.write(df)
+                st.dataframe(df, use_container_width=True)
                 # 将查询结果存储在会话状态中
                 st.session_state["sparql_query_results"] = df
             else:

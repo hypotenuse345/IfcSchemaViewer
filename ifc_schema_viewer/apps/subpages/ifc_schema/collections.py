@@ -9,7 +9,7 @@ from streamlit_extras.grid import grid as st_grid
 from pydantic import BaseModel, PrivateAttr, Field
 from typing import List, Optional, Any, Dict, Annotated, Type
 
-from ifc_schema_viewer.utils import EchartsUtility
+from ifc_schema_viewer.utils import EchartsUtility, timer_wrapper
 
 from .individuals import IfcConceptRenderer
 
@@ -32,6 +32,7 @@ class ConceptCollectionInfo(BaseModel):
     def namespace_manager(self):
         return self.rdf_graph.namespace_manager
     
+    @timer_wrapper
     def _retrieve_members(self):
         filter_condition = " || ".join([f"?express_type = <{type}>" for type in self.express_types])
         filter_condition = f"FILTER ({filter_condition})"
@@ -60,6 +61,7 @@ class ConceptCollectionInfo(BaseModel):
             raise ValueError("rdf_graph must be an instance of rdflib.Graph")
         self._retrieve_members()
     
+    @timer_wrapper
     def render_multiselect(self):
         keyword = st.text_input("输入查询关键词", key=f"collection_info_{self.express_types[0]}")
         if keyword:
@@ -69,6 +71,7 @@ class ConceptCollectionInfo(BaseModel):
         selections = st.multiselect("选择要查看的内容", list(members.keys()))
         return members, selections
     
+    @timer_wrapper
     def render(self):
         members, selections = self.render_multiselect()
         if selections:

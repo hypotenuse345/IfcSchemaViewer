@@ -267,25 +267,71 @@ class SchemaExplorationSubPage(RDFQuerySubPage):
                 
             derived_types.render()
 
+    def get_express_types(self) -> List[str]:
+        results = self.ifc_schema_dataset.query(f"""SELECT ?express_type WHERE {{
+            ?express_type a owl:Class;
+                rdfs:subClassOf+ express:SchematicConcept.
+            FILTER (STRSTARTS(STR(?express_type), "http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#"))
+        }}""")
+        return [result.express_type.fragment for result in results]
+
+    def _generate_sparql_query_by_template(self, prefixes):
+        express_types = self.get_express_types()
+        grid = st_grid([1, 1])
+        
+        option = grid.selectbox("选择一个要检索的类型", express_types)
+        limit = grid.number_input("限制返回结果数量", value=10, min_value=0)
+        limit_condition = f"LIMIT {limit}" if limit > 0 else ""
+        st.session_state["sparql_query"] = prefixes + f"""
+SELECT DISTINCT ?s WHERE {{
+    ?s a express:{option}.
+}} {limit_condition}
+        """
+    
+    def _generate_sparql_query_by_natural_language(self, prefixes):
+        pass
+
+    def generate_sparql_query_widget(self):
+        """用某种方式生成SPARQL查询"""
+        prefixes = """PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX express: <http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#>
+PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
+            """
+        
+        generating_option = st.radio("选择生成方式", ["模板生成", "自然语言生成"], horizontal=True, label_visibility="collapsed")
+        if generating_option == "模板生成":
+            self._generate_sparql_query_by_template(prefixes)
+        elif generating_option == "自然语言生成":
+            self._generate_sparql_query_by_natural_language(prefixes)
+
     @st.fragment
     @timer_wrapper
     def display_sparql_query_widget(self):
-        if st.checkbox("显示SPARQL查询页面", value=False):
+        if st.checkbox("显示SPARQL查询页面 (开发中)", value=False):
             ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
             
             grid_layout = st_grid([1, 1])
             query_container, history_container = [grid_layout.container() for _ in range(2)]
             with query_container.container():
-                history_management_container = st.empty()
+                generating_query_placeholder = st.empty()
+                with generating_query_placeholder.container(border=True):
+                    self.generate_sparql_query_widget()
+                    
                 with st.form("SPARQL_Query"):
                     query_str = st.text_area(
                             "Enter a SPARQL query", value="SELECT * WHERE { ?s ?p ?o } LIMIT 10" if st.session_state.get("sparql_query") is None else st.session_state["sparql_query"], 
                             key="sparql_query_editor", help="SELECT * WHERE { ?s ?p ?o }", height=200)
                     to_query = st.form_submit_button("Run Query")
                     st.session_state["sparql_query"] = query_str
+                
+                history_management_container = st.empty()
                 if to_query:
                     self.run_sparql_query_widget(ifc_schema_graph, query_str)
-            generating_query_placeholder = st.empty()
+            
             self.sparql_query_history_editor_widget(history_management_container,"")
             self.sparql_query_history_container_widget(history_container.container())
     
