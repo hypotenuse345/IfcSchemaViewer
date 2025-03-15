@@ -1,3 +1,5 @@
+langchain_community==0.3.19
+langchain_core==0.3.44
 numpy==2.2.3
 pandas==2.2.3
 pydantic==2.10.6

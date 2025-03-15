@@ -5,6 +5,8 @@ from streamlit_extras.grid import grid as st_grid
 from typing import List, Dict, Annotated
 from pydantic import BaseModel, Field, PrivateAttr, computed_field
 
+from langchain_community.chat_message_histories.streamlit import StreamlitChatMessageHistory
+
 import rdflib
 from rdflib import Dataset
 
@@ -91,6 +93,10 @@ class SubPage(BaseModel):
                 html_content,
                 unsafe_allow_html=True,
             )
-
+            
+    def _initialize_history(self, history_name="chat_history"):
+        """Initialize conversation history for demonstration."""
+        return StreamlitChatMessageHistory(history_name)
+    
     def render(self):
         raise NotImplementedError()

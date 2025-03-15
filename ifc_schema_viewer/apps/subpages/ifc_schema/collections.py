@@ -66,7 +66,7 @@ class ConceptCollectionInfo(BaseModel):
             members = {k: v for k, v in self.members.items() if keyword.lower() in k.lower()}
         else:
             members = self.members
-        selections = st.multiselect("选择属性集", list(members.keys()))
+        selections = st.multiselect("选择要查看的内容", list(members.keys()))
         return members, selections
     
     def render(self):

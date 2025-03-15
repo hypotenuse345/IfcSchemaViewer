@@ -11,6 +11,8 @@ import rdflib
 from rdflib import RDF, RDFS, OWL, SKOS, Dataset
 import os
 
+from ifc_schema_viewer.utils import timer_wrapper
+
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
 INST = rdflib.Namespace("http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#")
 
@@ -31,7 +33,7 @@ class IfcSchemaViewerApp(StreamlitBaseApp):
     def schema_exploration_subpage(self) -> SchemaExplorationSubPage:
         return self._schema_exploration_subpage
     
-    
+    @timer_wrapper
     def parse_ifc_schema_dataset(self):
         def get_properties(g: rdflib.Dataset):
             property_dict = {}

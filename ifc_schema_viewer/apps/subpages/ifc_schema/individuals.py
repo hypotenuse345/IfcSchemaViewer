@@ -681,7 +681,20 @@ class PEnumPropRange(PropRange):
             st.write(f"**{self.name}**")
         with param_value_container:
             self._value = st.selectbox(f"{self.name}_enum_values", [mem["enum value"] for mem in self.concept_info.members], label_visibility="collapsed")
-                
+
+class EntityPropRange(PropRange):
+    def model_post_init(self, __context):
+        # check if the property range is an entity
+        if not isinstance(self.concept_info, EntityInfo):
+            raise ValueError("Property range is not an entity")
+
+    def to_input(self):
+        grid = st_grid([1,3])
+        param_name_container, param_value_container = grid.container(), grid.container()
+        with param_name_container:
+            st.write(f"**{self.name}** (reference)")
+        with param_value_container:
+            self._value = st.number_input(f"{self.name}_instance_id", min_value=1, step=1, label_visibility="collapsed")
 
 class PsetInfo(ConceptInfo):
     _express_type: str = PrivateAttr("express:PropertySetTemplate")
@@ -750,6 +763,10 @@ class PsetInfo(ConceptInfo):
                 self.prop_ranges.append(
                     PEnumPropRange(name=result_row.prop_name,
                                    concept_info=PropertyEnumInfo(iri=result_row.dataType,rdf_graph=self.rdf_graph)))
+            elif dataType_express_type == ONT["Entity"]:
+                self.prop_ranges.append(
+                    EntityPropRange(name=result_row.prop_name,
+                                    concept_info=EntityInfo(iri=result_row.dataType,rdf_graph=self.rdf_graph)))
             else:
                 st.warning(f"Unknown data type: {dataType_express_type}")
             

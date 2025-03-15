@@ -11,14 +11,15 @@ from typing import Optional, List, Dict, Any, Literal, Union
 import pandas as pd
 import re
 
-from .base import SubPage
+from ifc_schema_viewer.utils.timer import timer_wrapper
+from .rdf_query import RDFQuerySubPage
 
 from .ifc_schema import IfcConceptRenderer, PSetCollectionInfo, EnumerationCollectionInfo, EntityCollectionInfo, DerivedTypeCollectionInfo
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
 INST = rdflib.Namespace("http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#")
 
-class SchemaExplorationSubPage(SubPage):
+class SchemaExplorationSubPage(RDFQuerySubPage):
     _predicate_map : Dict[str, str] = {
             RDF.type: "类型",
             RDFS.label: "标签",
@@ -34,6 +35,7 @@ class SchemaExplorationSubPage(SubPage):
             ONT["addendums"]: "补丁版本序号",
             ONT["corrigendum"]: "修正版本序号",
         }    
+    @timer_wrapper
     def display_basic_info(self):
         predicate_map = self._predicate_map
         
@@ -58,7 +60,6 @@ class SchemaExplorationSubPage(SubPage):
             # metadata += "]\n\n"
             return metadata
         
-        # @st.cache_resource
         def get_metadata_of_ifc_schema(_g: rdflib.Graph)-> str:
             metadata = ""
             for root_node in _g.subjects(RDF.type, ONT["IfcSchema"], unique=True):
@@ -86,6 +87,7 @@ class SchemaExplorationSubPage(SubPage):
         # st.write(f"共计{len(ifc_schema_graph)}个三元组在这个图谱中")
     
     @st.fragment
+    @timer_wrapper
     def display_concept_groups_widget(self):
         def replace_ifc_concept_to_link(match):
             url = f"https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{match.group(0)}.htm"
@@ -109,35 +111,37 @@ class SchemaExplorationSubPage(SubPage):
                 pattern = r'Ifc\w+'
                 mdlit(re.sub(pattern, replace_ifc_concept_to_link, definitions))
         
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        if st.checkbox("显示概念组信息", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
-        for root_node in ifc_schema_graph.subjects(RDF.type, ONT["IfcSchema"], unique=True):
-            data_schemas = IfcConceptRenderer.get_data_schemas(root_node, ifc_schema_graph)
-            grid = st_grid([1,1])
-            main_col, info_graph_col = grid.container(), grid.container()
-            with main_col:
-                selected_layer = st.selectbox("概念层", options=data_schemas.keys())
-                conceptual_groups = IfcConceptRenderer.get_conceptual_groups(data_schemas[selected_layer], ifc_schema_graph)
-                selected_conceptual_group = st.selectbox("概念组", options=conceptual_groups.keys())
-                display_conceptual_group_info(selected_conceptual_group, conceptual_groups, info_graph_col)
-                concepts = IfcConceptRenderer.get_concepts(conceptual_groups[selected_conceptual_group]["iri"], self.ifc_schema_dataset)
-                selected_obj = st.dataframe(
-                    concepts, hide_index=True, use_container_width=True, on_select="rerun",
-                    selection_mode="single-row", column_order=["type", "name", "definitions"]
-                )
-                if selected_obj["selection"]["rows"]:
-                    selected_index = selected_obj["selection"]["rows"][0]
-                    selected_obj = concepts["iri"][selected_index]
-                    selected_concept = selected_obj.fragment
-                    mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
-                    display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
-                    if st.checkbox("显示实例图结构", value=False):
-                        IfcConceptRenderer.render_selected_instance_echarts(selected_obj, ifc_schema_graph, height=600)
-                    selected_type = concepts["type"][selected_index]
-                    with info_graph_col:
-                        IfcConceptRenderer.display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)
-                    # st.write(f"**{selected_obj}** is selected")
+            for root_node in ifc_schema_graph.subjects(RDF.type, ONT["IfcSchema"], unique=True):
+                data_schemas = IfcConceptRenderer.get_data_schemas(root_node, ifc_schema_graph)
+                grid = st_grid([1,1])
+                main_col, info_graph_col = grid.container(), grid.container()
+                with main_col:
+                    selected_layer = st.selectbox("概念层", options=data_schemas.keys())
+                    conceptual_groups = IfcConceptRenderer.get_conceptual_groups(data_schemas[selected_layer], ifc_schema_graph)
+                    selected_conceptual_group = st.selectbox("概念组", options=conceptual_groups.keys())
+                    display_conceptual_group_info(selected_conceptual_group, conceptual_groups, info_graph_col)
+                    concepts = IfcConceptRenderer.get_concepts(conceptual_groups[selected_conceptual_group]["iri"], self.ifc_schema_dataset)
+                    selected_obj = st.dataframe(
+                        concepts, hide_index=True, use_container_width=True, on_select="rerun",
+                        selection_mode="single-row", column_order=["type", "name", "definitions"]
+                    )
+                    if selected_obj["selection"]["rows"]:
+                        selected_index = selected_obj["selection"]["rows"][0]
+                        selected_obj = concepts["iri"][selected_index]
+                        selected_concept = selected_obj.fragment
+                        mdlit(f"@(Learn more about **{selected_concept}** on buildingSMART official website)(https://ifc43-docs.standards.buildingsmart.org/IFC/RELEASE/IFC4x3/HTML/lexical/{selected_concept}.htm)")
+                        display_concept_info(selected_concept, concepts["type"][selected_index], concepts["definitions"][selected_index], info_graph_col)
+                        if st.checkbox("显示实例图结构", value=False):
+                            IfcConceptRenderer.render_selected_instance_echarts(selected_obj, ifc_schema_graph, height=600)
+                        selected_type = concepts["type"][selected_index]
+                        with info_graph_col:
+                            IfcConceptRenderer.display_selected_individual_info(selected_type, selected_obj, ifc_schema_graph)
+                        # st.write(f"**{selected_obj}** is selected")
     
+    @timer_wrapper
     def _display_property_sets_info_by_pset(self, ifc_schema_graph: rdflib.Graph):
         if st.session_state.get("psets", None) is None:
             psets = PSetCollectionInfo(rdf_graph=ifc_schema_graph)
@@ -175,6 +179,7 @@ class SchemaExplorationSubPage(SubPage):
             }
         return psets
     
+    @timer_wrapper
     def _display_property_sets_info_by_entity(self, ifc_schema_graph: rdflib.Graph):
         if st.session_state.get("entities", None) is None:
             entities = EntityCollectionInfo(rdf_graph=ifc_schema_graph)
@@ -208,71 +213,101 @@ class SchemaExplorationSubPage(SubPage):
                         )
     
     @st.fragment
+    @timer_wrapper
     def display_property_sets_info_widget(self):
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        if st.checkbox("显示属性集检索页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
-        search_option = st.radio("选择检索方式", ["按属性集检索", "按实体检索"], horizontal=True, label_visibility="collapsed")
-        
-        if search_option == "按属性集检索":
-            self._display_property_sets_info_by_pset(ifc_schema_graph)
-        elif search_option == "按实体检索":
-            self._display_property_sets_info_by_entity(ifc_schema_graph)
+            search_option = st.radio("选择检索方式", ["按属性集检索", "按实体检索"], horizontal=True, label_visibility="collapsed")
+            
+            if search_option == "按属性集检索":
+                self._display_property_sets_info_by_pset(ifc_schema_graph)
+            elif search_option == "按实体检索":
+                self._display_property_sets_info_by_entity(ifc_schema_graph)
     
     @st.fragment
+    @timer_wrapper
     def display_entities_info_widget(self):
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        if st.checkbox("显示实体检索页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
-        if st.session_state.get("entities", None) is None:
-            entities = EntityCollectionInfo(rdf_graph=ifc_schema_graph)
-            st.session_state["entities"] = entities
-        else:
-            entities = st.session_state["entities"]
-            
-        entities.render()
+            if st.session_state.get("entities", None) is None:
+                entities = EntityCollectionInfo(rdf_graph=ifc_schema_graph)
+                st.session_state["entities"] = entities
+            else:
+                entities = st.session_state["entities"]
+                
+            entities.render()
     
     @st.fragment
+    @timer_wrapper
     def display_enumerations_widget(self):
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+        if st.checkbox("显示枚举检索页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
         
-        if st.session_state.get("enumerations", None) is None:
-            enumerations = EnumerationCollectionInfo(rdf_graph=ifc_schema_graph)
-            st.session_state["enumerations"] = enumerations
-        else:
-            enumerations = st.session_state["enumerations"]
-            
-        enumerations.render()
+            if st.session_state.get("enumerations", None) is None:
+                enumerations = EnumerationCollectionInfo(rdf_graph=ifc_schema_graph)
+                st.session_state["enumerations"] = enumerations
+            else:
+                enumerations = st.session_state["enumerations"]
+                
+            enumerations.render()
               
     @st.fragment
+    @timer_wrapper
     def display_derived_types_widget(self):
-        ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
-        
-        if st.session_state.get("derived_types", None) is None:
-            derived_types = DerivedTypeCollectionInfo(rdf_graph=ifc_schema_graph)
-            st.session_state["derived_types"] = derived_types
-        else:
-            derived_types = st.session_state["derived_types"]
+        if st.checkbox("显示派生类型检索页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
             
-        derived_types.render()
-        
+            if st.session_state.get("derived_types", None) is None:
+                derived_types = DerivedTypeCollectionInfo(rdf_graph=ifc_schema_graph)
+                st.session_state["derived_types"] = derived_types
+            else:
+                derived_types = st.session_state["derived_types"]
+                
+            derived_types.render()
+
+    @st.fragment
+    @timer_wrapper
+    def display_sparql_query_widget(self):
+        if st.checkbox("显示SPARQL查询页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+            
+            grid_layout = st_grid([1, 1])
+            query_container, history_container = [grid_layout.container() for _ in range(2)]
+            with query_container.container():
+                history_management_container = st.empty()
+                with st.form("SPARQL_Query"):
+                    query_str = st.text_area(
+                            "Enter a SPARQL query", value="SELECT * WHERE { ?s ?p ?o } LIMIT 10" if st.session_state.get("sparql_query") is None else st.session_state["sparql_query"], 
+                            key="sparql_query_editor", help="SELECT * WHERE { ?s ?p ?o }", height=200)
+                    to_query = st.form_submit_button("Run Query")
+                    st.session_state["sparql_query"] = query_str
+                if to_query:
+                    self.run_sparql_query_widget(ifc_schema_graph, query_str)
+            generating_query_placeholder = st.empty()
+            self.sparql_query_history_editor_widget(history_management_container,"")
+            self.sparql_query_history_container_widget(history_container.container())
     
     def render(self):
         with st.sidebar:
-            sidetab1, sidetab2 = st.tabs(["📝 基本信息", "👨‍💻 开发者信息"])
+            sidetab1, sidetab3 = st.tabs(["📝 基本信息", "👨‍💻 开发者信息"])
         
         with sidetab1:
             self.display_basic_info()
             
-        self.display_creator_widget(sidetab2)
+        self.display_creator_widget(sidetab3)
         
         # 占位： 主页面
         main_col = st.container()
         with main_col:
-            maintab1, maintab2, maintab3, maintab4, maintab5 = st.tabs([
+            maintab1, maintab2, maintab3, maintab4, maintab5, maintab6 = st.tabs([
                 "📝 按概念组查看",
                 "📚 属性集检索",
                 "🌐 实体继承关系",
                 "🏷️ 枚举类", 
-                "🔗 导出类型",])
+                "🔗 导出类型",
+                "📡 SPARQL 查询",])
             
             with maintab1.container():
                 self.display_concept_groups_widget()
@@ -288,3 +323,8 @@ class SchemaExplorationSubPage(SubPage):
 
             with maintab5.container():
                 self.display_derived_types_widget()
+
+            with maintab6.container():
+                self.display_sparql_query_widget()
+                
+            

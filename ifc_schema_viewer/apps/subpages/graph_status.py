@@ -11,9 +11,10 @@ import pandas as pd
 
 from .base import SubPage
 
-from ...utils import EchartsUtility, GraphAlgoUtility
+from ifc_schema_viewer.utils import EchartsUtility, GraphAlgoUtility, timer_wrapper
 
 class GraphStatusSubPage(SubPage):
+    @timer_wrapper
     def display_basic_info(self):
         graphs = self.ifc_schema_dataset.graphs()
         graphs = {str(graph.identifier.n3(self.ifc_schema_dataset.namespace_manager)): graph for graph in graphs}
@@ -31,6 +32,7 @@ class GraphStatusSubPage(SubPage):
             grid.container()
     
     @st.fragment
+    @timer_wrapper
     def display_subgraph_statistics(self):
         import math
         graphs = self.ifc_schema_dataset.graphs()
@@ -68,6 +70,7 @@ class GraphStatusSubPage(SubPage):
                 grid.metric(graph_name, size)
     
     @st.fragment
+    @timer_wrapper
     def display_namespaces(self):
         namespaces = self.ifc_schema_dataset.namespaces()
         namespaces = {k: v for k, v in namespaces}
@@ -83,6 +86,7 @@ class GraphStatusSubPage(SubPage):
             column_order=["Prefix", "Namespace"],
         )
     
+    @timer_wrapper
     def _get_inheritance_map(self, echarts_graph_info, predicate: rdflib.URIRef, obj_range: List[str]):
         import numpy as np
         inheritance_map = {}
@@ -148,7 +152,8 @@ class GraphStatusSubPage(SubPage):
             })
         
     
-    @st.fragment         
+    @st.fragment
+    @timer_wrapper         
     def render_class_hierarchy(self, option_to_label_visualization: bool=False):
         echarts_graph_info = {}
         echarts_graph_info["nodes"] = []
@@ -173,6 +178,7 @@ class GraphStatusSubPage(SubPage):
         return s
     
     @st.fragment
+    @timer_wrapper
     def render_property_hierarchy(self, option_to_label_visualization: bool=False):
         echarts_graph_info = {}
         echarts_graph_info["nodes"] = []
@@ -203,7 +209,8 @@ class GraphStatusSubPage(SubPage):
         )
         return s
     
-    @st.fragment     
+    @st.fragment
+    @timer_wrapper     
     def display_metadata(self, node_iri, container):
         node_iri = rdflib.URIRef(node_iri)
         metadata = ""
@@ -261,6 +268,7 @@ class GraphStatusSubPage(SubPage):
                 st.markdown(metadata)
     
     @st.fragment
+    @timer_wrapper
     def ontology_visualization(self):
         grid = st_grid([5, 1])
         option_to_visualize = grid.selectbox("选择要可视化的内容", ["类继承关系", "属性继承关系"], label_visibility="collapsed")
@@ -280,6 +288,7 @@ class GraphStatusSubPage(SubPage):
                 st.success("已生成图！")
         if selected_iri:
             self.display_metadata(selected_iri, info_col)
+            
     def _get_namespace_category(self, a_label: str, category_map:Dict[str, int], echarts_graph_info: Dict[str, Any]):
         namespace = a_label.split(':')[0]
         if namespace not in category_map:
@@ -295,6 +304,7 @@ class GraphStatusSubPage(SubPage):
             "category": self._get_namespace_category(a_label, category_map, echarts_graph_info)})
 
     @st.fragment
+    @timer_wrapper
     def render_classes(self):
         def render_selected_class_echarts(ontology_graph, class_iri, height=400):
             class_iri = rdflib.URIRef(class_iri)
@@ -357,6 +367,7 @@ class GraphStatusSubPage(SubPage):
                 render_selected_class_echarts(self.ifc_schema_dataset, selected_iri)
             self.display_metadata(selected_iri, info_col) 
     @st.fragment
+    @timer_wrapper
     def render_properties(self):
         def render_selected_prop_echarts(ontology_graph, prop_iri, height=400):
             prop_iri = rdflib.URIRef(prop_iri)
