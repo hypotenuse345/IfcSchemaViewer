@@ -14,7 +14,14 @@ import re
 from ifc_schema_viewer.utils.timer import timer_wrapper
 from .rdf_query import RDFQuerySubPage
 
-from .ifc_schema import IfcConceptRenderer, PSetCollectionInfo, EnumerationCollectionInfo, EntityCollectionInfo, DerivedTypeCollectionInfo
+from .ifc_schema import (
+    IfcConceptRenderer, 
+    PSetCollectionInfo, 
+    EnumerationCollectionInfo, 
+    EntityCollectionInfo, 
+    DerivedTypeCollectionInfo,
+    SelectTypeCOllectionInfo
+)
 
 ONT = rdflib.Namespace("http://www.semantic.org/zeyupan/ontologies/CoALA4IFC_Schema_Ont#")
 INST = rdflib.Namespace("http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#")
@@ -267,6 +274,21 @@ class SchemaExplorationSubPage(RDFQuerySubPage):
                 
             derived_types.render()
 
+    
+    @st.fragment
+    @timer_wrapper
+    def display_select_types_widget(self):
+        if st.checkbox("显示选择类型检索页面", value=False):
+            ifc_schema_graph = self.ifc_schema_dataset.get_graph(INST["IFC_SCHEMA_GRAPH"])
+            
+            if st.session_state.get("select_types", None) is None:
+                select_types = SelectTypeCOllectionInfo(rdf_graph=ifc_schema_graph)
+                st.session_state["select_types"] = select_types
+            else:
+                select_types = st.session_state["select_types"]
+                
+            select_types.render()
+
     def get_express_types(self) -> List[str]:
         results = self.ifc_schema_dataset.query(f"""SELECT ?express_type WHERE {{
             ?express_type a owl:Class;
@@ -347,12 +369,13 @@ PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
         # 占位： 主页面
         main_col = st.container()
         with main_col:
-            maintab1, maintab2, maintab3, maintab4, maintab5, maintab6 = st.tabs([
+            maintab1, maintab2, maintab3, maintab4, maintab5, maintab6, maintab7 = st.tabs([
                 "📝 按概念组查看",
                 "📚 属性集检索",
                 "🌐 实体继承关系",
                 "🏷️ 枚举类", 
                 "🔗 派生类型",
+                "✅ 选择类",
                 "📡 SPARQL 查询",])
             
             with maintab1.container():
@@ -371,6 +394,9 @@ PREFIX ifc: <http://www.semantic.org/zeyupan/instances/CoALA4IFC_Schema_Inst#>
                 self.display_derived_types_widget()
 
             with maintab6.container():
+                self.display_select_types_widget()
+
+            with maintab7.container():
                 self.display_sparql_query_widget()
                 
             

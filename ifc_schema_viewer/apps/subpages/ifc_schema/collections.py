@@ -108,3 +108,8 @@ class DerivedTypeCollectionInfo(ConceptCollectionInfo):
     def model_post_init(self, __context):
         self._express_types = [ONT["DerivedType"],]
         super().model_post_init(__context)
+        
+class SelectTypeCOllectionInfo(ConceptCollectionInfo):
+    def model_post_init(self, __context):
+        self._express_types = [ONT["Select"],]
+        super().model_post_init(__context)

@@ -652,6 +652,8 @@ class DerivedPropRange(PropRange):
             return st.number_input(f"{prop_name}_derived_type", step=1, label_visibility="collapsed")
         elif derived_from == "BOOLEAN":
             return st.checkbox(f"{prop_name}_derived_type", label_visibility="collapsed")
+        elif derived_from == "LOGICAL":
+            return st.selectbox(f"{prop_name}_derived_type", ["UNKNOWN", "TRUE", "FALSE"], label_visibility="collapsed")
         elif derived_from.startswith("Ifc"):
             self.concept_info = DerivedTypeInfo(iri=INST[derived_from], rdf_graph=self.rdf_graph)
             return self.recursive_to_input(prop_name, self.concept_info.derived_from)
@@ -886,6 +888,8 @@ class DerivedTypeInfo(TypeInfo):
                     result =  st.number_input(f"{self.seed}_{self.iri}_input", step=1, label_visibility="collapsed")
                 elif derived_from == "BOOLEAN":
                     result =  st.checkbox(f"{self.seed}_{self.iri}_input", label_visibility="collapsed")
+                elif derived_from == "LOGICAL":
+                    result = st.selectbox(f"{self.seed}_{self.iri}_input", ["UNKNOWN", "TRUE", "FALSE"], label_visibility="collapsed")
                 elif derived_from.startswith("Ifc"):
                     result =  self.recursive_to_input(DerivedTypeInfo(iri=INST[self.derived_from], rdf_graph=self.rdf_graph))
                 else:
